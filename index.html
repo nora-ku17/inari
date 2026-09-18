@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>シンプルタイマー</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --card: #16213e;
+    --accent: #0f9d58;
+    --accent-hover: #0c8047;
+    --text: #eaeaea;
+    --sub: #9aa0b4;
+    --danger: #e94560;
+    --danger-hover: #c7304d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #1a1a2e, #0f0f1e);
+    font-family: "Segoe UI", "Hiragino Sans", "Yu Gothic", sans-serif;
+    color: var(--text);
+  }
+  .card {
+    background: var(--card);
+    border-radius: 24px;
+    padding: 40px 48px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    text-align: center;
+    width: 360px;
+    max-width: 90vw;
+  }
+  h1 {
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--sub);
+    margin: 0 0 24px;
+    letter-spacing: 2px;
+  }
+  .display {
+    font-size: 64px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    margin: 10px 0 28px;
+    letter-spacing: 2px;
+    transition: color 0.3s;
+  }
+  .display.warning { color: var(--danger); }
+  .inputs {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+  .inputs.hidden { display: none; }
+  .inputs input {
+    width: 64px;
+    padding: 10px;
+    font-size: 20px;
+    text-align: center;
+    border-radius: 10px;
+    border: 1px solid #333a56;
+    background: #0f1626;
+    color: var(--text);
+  }
+  .inputs input:focus { outline: 2px solid var(--accent); }
+  .inputs span {
+    align-self: center;
+    color: var(--sub);
+    font-size: 14px;
+  }
+  .buttons {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+  }
+  button {
+    border: none;
+    border-radius: 12px;
+    padding: 12px 20px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    color: white;
+    transition: background 0.2s, transform 0.1s;
+    flex: 1;
+  }
+  button:active { transform: scale(0.96); }
+  .btn-start { background: var(--accent); }
+  .btn-start:hover { background: var(--accent-hover); }
+  .btn-reset { background: #333a56; }
+  .btn-reset:hover { background: #454e77; }
+  .btn-danger { background: var(--danger); }
+  .btn-danger:hover { background: var(--danger-hover); }
+  .presets {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .presets button {
+    flex: none;
+    background: #0f1626;
+    color: var(--sub);
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .presets button:hover { background: #1b2540; color: var(--text); }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>TIMER</h1>
+    <div class="display" id="display">00:00</div>
+
+    <div class="presets" id="presets">
+      <button data-sec="60">1分</button>
+      <button data-sec="180">3分</button>
+      <button data-sec="300">5分</button>
+      <button data-sec="600">10分</button>
+    </div>
+
+    <div class="inputs" id="inputs">
+      <input type="number" id="minInput" min="0" max="999" value="5">
+      <span>分</span>
+      <input type="number" id="secInput" min="0" max="59" value="0">
+      <span>秒</span>
+    </div>
+
+    <div class="buttons">
+      <button class="btn-start" id="startBtn">開始</button>
+      <button class="btn-reset" id="resetBtn">リセット</button>
+    </div>
+  </div>
+
+<audio id="alarmSound" preload="auto">
+  <source src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=" type="audio/wav">
+</audio>
+
+<script>
+  const display = document.getElementById('display');
+  const minInput = document.getElementById('minInput');
+  const secInput = document.getElementById('secInput');
+  const inputs = document.getElementById('inputs');
+  const presets = document.getElementById('presets');
+  const startBtn = document.getElementById('startBtn');
+  const resetBtn = document.getElementById('resetBtn');
+
+  let totalSeconds = 5 * 60;
+  let remaining = totalSeconds;
+  let intervalId = null;
+  let running = false;
+
+  function format(sec) {
+    const m = Math.floor(sec / 60).toString().padStart(2, '0');
+    const s = (sec % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  }
+
+  function updateDisplay() {
+    display.textContent = format(remaining);
+    display.classList.toggle('warning', remaining <= 10 && remaining > 0);
+  }
+
+  function setFromInputs() {
+    const m = Math.max(0, parseInt(minInput.value, 10) || 0);
+    const s = Math.max(0, Math.min(59, parseInt(secInput.value, 10) || 0));
+    totalSeconds = m * 60 + s;
+    remaining = totalSeconds;
+    updateDisplay();
+  }
+
+  function tick() {
+    remaining--;
+    updateDisplay();
+    if (remaining <= 0) {
+      stop();
+      display.classList.remove('warning');
+      display.textContent = "00:00";
+      alertDone();
+    }
+  }
+
+  function alertDone() {
+    document.title = "⏰ 時間です！";
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const beep = (delay) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = 880;
+        gain.gain.setValueAtTime(0.2, ctx.currentTime + delay);
+        osc.start(ctx.currentTime + delay);
+        osc.stop(ctx.currentTime + delay + 0.3);
+      };
+      beep(0); beep(0.4); beep(0.8);
+    } catch (e) {}
+    startBtn.textContent = "開始";
+    startBtn.classList.remove('btn-danger');
+    startBtn.classList.add('btn-start');
+    inputs.classList.remove('hidden');
+    presets.style.display = 'flex';
+    setTimeout(() => { document.title = "シンプルタイマー"; }, 3000);
+  }
+
+  function start() {
+    if (remaining <= 0) setFromInputs();
+    if (remaining <= 0) return;
+    running = true;
+    inputs.classList.add('hidden');
+    presets.style.display = 'none';
+    startBtn.textContent = "一時停止";
+    startBtn.classList.remove('btn-start');
+    startBtn.classList.add('btn-danger');
+    intervalId = setInterval(tick, 1000);
+  }
+
+  function pause() {
+    running = false;
+    clearInterval(intervalId);
+    startBtn.textContent = "再開";
+    startBtn.classList.remove('btn-danger');
+    startBtn.classList.add('btn-start');
+  }
+
+  function stop() {
+    running = false;
+    clearInterval(intervalId);
+  }
+
+  function reset() {
+    stop();
+    inputs.classList.remove('hidden');
+    presets.style.display = 'flex';
+    startBtn.textContent = "開始";
+    startBtn.classList.remove('btn-danger');
+    startBtn.classList.add('btn-start');
+    setFromInputs();
+  }
+
+  startBtn.addEventListener('click', () => {
+    if (running) pause();
+    else start();
+  });
+
+  resetBtn.addEventListener('click', reset);
+
+  minInput.addEventListener('change', setFromInputs);
+  secInput.addEventListener('change', setFromInputs);
+
+  presets.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-sec]');
+    if (!btn) return;
+    const sec = parseInt(btn.dataset.sec, 10);
+    minInput.value = Math.floor(sec / 60);
+    secInput.value = sec % 60;
+    setFromInputs();
+  });
+
+  setFromInputs();
+</script>
+</body>
+</html>

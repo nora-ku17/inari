@@ -1,0 +1,21 @@
+No.,会社名,部署,役職,氏名,氏名(英語),都道府県,郵便番号,住所,電話番号,メールアドレス,画像ファイル
+1,株式会社山田商事,営業部,部長,山田太郎,,,,東京都千代田区丸の内1-2-3,03-1234-5678,taro.yamada@yamada-shoji.co.jp,card_01.jpg
+2,株式会社フューチャーラボ,研究開発部,研究員,松本理恵,,,,東京都文京区本郷25-26-27,03-1111-2222,rie.matsumoto@futurelab.co.jp,card_02.jpg
+3,有限会社丸山建設,工事部,現場監督,丸山幸治,,埼玉県,330-0846,埼玉県さいたま市大宮区桜木町28-29,048-3333-4444,koji.maruyama@maruyama-kensetsu.jp,card_03.jpg
+4,株式会社スターデザイン,,アートディレクター,中村あゆみ,,,,東京都目黒区自由が丘30-31,03-5555-6666,ayumi.nakamura@stardesign.co.jp,card_04.jpg
+5,社会福祉法人あおぞら,介護部,介護福祉士,井上雄太,,,,兵庫県神戸市中央区三宮32-33,078-7777-8888,yuta.inoue@aozora-welfare.jp,card_05.jpg
+6,株式会社ノースウィンド,物流部,部長代理,木村真理子,,宮城県,980-0011,宮城県仙台市青葉区一番町34-35,022-9999-0000,mariko.kimura@northwind.co.jp,card_06.jpg
+7,合同会社デジタルクラフト,,Webデザイナー,林大地,Daichi Hayashi,,,東京都台東区蔵前36-37-38,03-2222-3333,daichi.hayashi@digitalcraft.jp,card_07.jpg
+8,株式会社サクラファーム,農業事業部,農場長,斎藤和也,,,,長野県長野市篠ノ井39-40,026-4444-5555,kazuya.saito@sakurafarm.co.jp,card_08.jpg
+9,一般社団法人日本IT推進協会,事務局,事務局長,山口恵美,Emi Yamaguchi,,,東京都港区赤坂41-42-43,03-6666-7777,emi.yamaguchi@japan-it.or.jp,card_09.jpg
+10,株式会社リバーサイドホテル,フロント部,支配人,清水翔太,,静岡県,413-0015,静岡県熱海市銀座町44-45,0557-8888-9999,shota.shimizu@riverside-hotel.co.jp,card_10.jpg
+11,有限会社ムーンライト出版,編集部,編集長,藤田奈々,,東京都,162-0825,東京都新宿区神楽坂46-47,03-0000-1111,nana.fujita@moonlight-pub.jp,card_11.jpg
+12,合同会社テクノブリッジ,開発部,エンジニア,佐藤美咲,Misaki Sato,大阪府,530-0001,大阪府大阪市北区梅田4-5-6,06-2345-6789,misaki.sato@technobridge.jp,card_12.jpg
+13,株式会社グリーンフォレスト,総務部,課長,鈴木健一,,,,愛知県名古屋市中区栄7-8-9,052-3456-7890,kenichi.suzuki@greenforest.co.jp,card_13.jpg
+14,有限会社ブルースカイ,企画部,主任,田中花子,,福岡県,810-0801,福岡県福岡市博多区中洲10-11,092-4567-8901,hanako.tanaka@bluesky-llc.jp,card_14.jpg
+15,株式会社サンライズ電機,技術部,係長,高橋誠,,北海道,060-0042,北海道札幌市中央区大通12-13,011-5678-9012,makoto.takahashi@sunrise-denki.co.jp,card_15.jpg
+16,NPO法人みらい教育,事務局,局長,渡辺裕子,,京都府,606-0824,京都府京都市左京区下鴨14-15,075-6789-0123,yuko.watanabe@mirai-edu.org,card_16.jpg
+17,株式会社オーシャンフーズ,品質管理部,マネージャー,伊藤大輔,,神奈川県,220-0012,神奈川県横浜市西区みなとみらい16-17,045-7890-1234,daisuke.ito@oceanfoods.co.jp,card_17.jpg
+18,合同会社クラウドネクスト,,CTO,小林拓也,,,,東京都渋谷区神宮前18-19-20,03-8901-2345,takuya.kobayashi@cloudnext.io,card_18.jpg
+19,株式会社和風堂,販売部,店長,加藤さくら,,,,奈良県奈良市三条町21-22,0742-9012-3456,sakura.kato@wafudo.co.jp,card_19.jpg
+20,医療法人健康会,事務部,事務長,吉田正明,,,,広島県広島市南区松原23-24,082-0123-4567,masaaki.yoshida@kenkoukai.or.jp,card_20.jpg
