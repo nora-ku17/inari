@@ -1,0 +1,1283 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>えいけんモンスター牧場</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Andika:wght@400;700&family=Mochiy+Pop+One&family=Zen+Maru+Gothic:wght@500;700;900&display=swap">
+<style>
+  :root {
+    color-scheme: light;
+    --ink: #1F2A44;
+    --ink-soft: #55607A;
+    --paper: #FFFFFF;
+    --sky: #BDE8FF;
+    --sky-2: #E6F6FF;
+    --meadow: #9BDDA9;
+    --meadow-dark: #3E9E63;
+    --sun: #FFD23F;
+    --berry: #FF5C8A;
+    --ok: #1FA35B;
+    --ok-bg: #DDF7E7;
+    --ng: #E5484D;
+    --ng-bg: #FFE3E3;
+    --lock: #C9D2DE;
+    --display: "Mochiy Pop One", "Zen Maru Gothic", "Hiragino Maru Gothic ProN", sans-serif;
+    --body: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", "Hiragino Sans", "Yu Gothic", sans-serif;
+    --en: "Andika", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: var(--body);
+    font-weight: 500;
+    color: var(--ink);
+    background: linear-gradient(180deg, var(--sky) 0%, var(--sky-2) 45%, #DDF4E2 100%) fixed;
+    background-color: var(--sky-2);
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  button:focus-visible, input:focus-visible, summary:focus-visible { outline: 3px solid var(--berry); outline-offset: 3px; }
+  [hidden] { display: none !important; }
+  .app { max-width: 480px; margin: 0 auto; padding-inline: 16px; padding-block: 12px 32px; min-height: 100%; }
+  .en { font-family: var(--en); }
+  h1, h2, h3 { font-family: var(--display); font-weight: 400; margin: 0; text-wrap: balance; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    min-height: 52px; padding: 10px 20px;
+    border: 3px solid var(--ink); border-radius: 16px;
+    background: var(--sun); box-shadow: 0 4px 0 var(--ink);
+    font-family: var(--display); font-size: 17px;
+    transition: transform .08s, box-shadow .08s;
+  }
+  .btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+  .btn.white { background: var(--paper); }
+  .btn.pink { background: var(--berry); color: #fff; }
+  .btn.green { background: var(--ok); color: #fff; }
+  .btn.small { min-height: 40px; font-size: 14px; padding: 6px 12px; border-radius: 12px; }
+  .btn:disabled { background: var(--lock); color: var(--ink-soft); }
+  .icon-btn {
+    width: 44px; height: 44px; border-radius: 50%;
+    border: 3px solid var(--ink); background: var(--paper); box-shadow: 0 3px 0 var(--ink);
+    display: inline-flex; align-items: center; justify-content: center; font-size: 18px; flex: none;
+  }
+  .icon-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
+  .icon-btn svg { width: 22px; height: 22px; }
+
+  .panel {
+    background: var(--paper); border: 3px solid var(--ink); border-radius: 20px;
+    box-shadow: 0 5px 0 var(--ink); padding: 16px;
+  }
+
+  /* ---------- start ---------- */
+  .logo { text-align: center; padding-block: 16px 8px; }
+  .logo .kicker { display: inline-block; font-family: var(--display); font-size: 13px; letter-spacing: .08em; background: var(--ink); color: var(--sun); padding: 4px 12px; border-radius: 999px; }
+  .logo h1 { font-size: clamp(30px, 9vw, 40px); line-height: 1.2; margin-top: 10px; color: var(--ink); text-shadow: 3px 3px 0 var(--paper); }
+  .logo p { margin: 8px 0 0; color: var(--ink-soft); font-weight: 700; }
+  .eggs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 18px; }
+  .egg-card {
+    border: 3px solid var(--ink); border-radius: 18px; background: var(--paper); box-shadow: 0 4px 0 var(--ink);
+    padding: 8px 4px 10px; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  }
+  .egg-card[aria-pressed="true"] { background: #FFF4C2; transform: translateY(-4px); box-shadow: 0 8px 0 var(--ink); }
+  .egg-card .t { font-family: var(--display); font-size: 14px; }
+  .egg-card svg { width: 100%; max-width: 110px; }
+  .field { margin-top: 18px; display: grid; gap: 6px; }
+  .field label { font-weight: 900; }
+  .field input {
+    font: inherit; font-size: 18px; padding: 12px 14px; border: 3px solid var(--ink); border-radius: 14px; background: var(--paper); width: 100%;
+  }
+  .start-go { margin-top: 18px; width: 100%; font-size: 20px; }
+  .plan { margin-top: 20px; font-size: 14px; }
+  .plan h3 { font-size: 15px; margin-bottom: 8px; }
+  .plan ol { margin: 0; padding-left: 1.4em; display: grid; gap: 3px; }
+
+  /* ---------- home ---------- */
+  .topbar { display: flex; align-items: center; gap: 10px; }
+  .topbar .grow { flex: 1; min-width: 0; }
+  .mon-name { font-family: var(--display); font-size: 20px; line-height: 1.2; overflow-wrap: anywhere; }
+  .mon-sub { font-size: 13px; color: var(--ink-soft); font-weight: 700; }
+  .ranch {
+    position: relative; margin-top: 12px; border: 3px solid var(--ink); border-radius: 24px; overflow: hidden;
+    background: linear-gradient(180deg, #CFEFFF 0 58%, var(--meadow) 58% 100%);
+    box-shadow: 0 5px 0 var(--ink);
+  }
+  .ranch::before { /* hill line */
+    content: ""; position: absolute; left: -10%; right: -10%; top: 50%; height: 30%;
+    background: #B6E8BF; border-radius: 50%; border-top: 3px solid var(--meadow-dark);
+  }
+  .ranch .sunball { position: absolute; top: 14px; right: 18px; width: 38px; height: 38px; border-radius: 50%; background: var(--sun); border: 3px solid var(--ink); }
+  .ranch .mon-wrap { position: relative; width: min(240px, 70%); margin: 8px auto 0; }
+  .ranch .mon-wrap button { display: block; width: 100%; background: none; border: 0; padding: 0; }
+  .say-bubble {
+    position: absolute; left: 14px; top: 14px; max-width: 46%;
+    background: var(--paper); border: 3px solid var(--ink); border-radius: 14px; padding: 6px 10px;
+    font-size: 14px; font-weight: 700; z-index: 2;
+  }
+  .say-bubble .en { font-size: 16px; font-weight: 700; }
+  .evo-bar { position: relative; padding: 10px 14px 12px; background: var(--paper); border-top: 3px solid var(--ink); }
+  .evo-bar .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; font-weight: 900; }
+  .evo-bar .row b { font-family: var(--display); font-weight: 400; font-size: 15px; }
+  .meter { margin-top: 6px; height: 16px; border: 3px solid var(--ink); border-radius: 999px; background: #EEF2F7; overflow: hidden; }
+  .meter > i { display: block; height: 100%; background: repeating-linear-gradient(-45deg, var(--berry) 0 10px, #FF7FA3 10px 20px); border-right: 3px solid var(--ink); transition: width .6s; }
+  .meter.sunny > i { background: repeating-linear-gradient(-45deg, var(--sun) 0 10px, #FFE27A 10px 20px); }
+  .evo-steps { display: flex; gap: 4px; margin-top: 8px; }
+  .evo-steps span { flex: 1; height: 6px; border-radius: 3px; background: #E3E8EF; }
+  .evo-steps span.on { background: var(--meadow-dark); }
+
+  .today { margin-top: 16px; display: grid; grid-template-columns: 1fr auto; gap: 8px 12px; align-items: center; }
+  .today h2 { font-size: 16px; }
+  .today .mins { font-family: var(--display); font-size: 22px; font-variant-numeric: tabular-nums; }
+  .today .mins small { font-size: 13px; color: var(--ink-soft); }
+  .today .meter { grid-column: 1 / -1; margin-top: 0; }
+  .today .note { grid-column: 1 / -1; font-size: 13px; color: var(--ink-soft); font-weight: 700; }
+  .tools { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+  .tools .btn { width: 100%; font-size: 15px; padding: 8px 10px; }
+  .tools .btn .count { background: var(--paper); color: var(--ink); border: 2px solid var(--ink); border-radius: 999px; padding: 0 8px; font-size: 13px; font-variant-numeric: tabular-nums; }
+
+  .map-title { font-family: var(--display); font-size: 18px; margin: 24px 0 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .map-title small { font-family: var(--body); font-weight: 900; font-size: 13px; color: var(--ink-soft); }
+  .area { border: 3px solid var(--ink); border-radius: 20px; background: var(--paper); box-shadow: 0 4px 0 var(--ink); margin-bottom: 14px; overflow: hidden; }
+  .area summary { list-style: none; display: flex; align-items: center; gap: 12px; padding: 12px 14px; cursor: pointer; }
+  .area summary::-webkit-details-marker { display: none; }
+  .area .day { flex: none; width: 54px; height: 54px; border-radius: 16px; border: 3px solid var(--ink); display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: var(--display); line-height: 1; background: var(--area-c, var(--sun)); }
+  .area .day small { font-size: 10px; letter-spacing: .06em; }
+  .area .day b { font-size: 22px; font-weight: 400; }
+  .area .ttl { flex: 1; min-width: 0; }
+  .area .ttl h3 { font-size: 16px; }
+  .area .ttl p { margin: 2px 0 0; font-size: 12px; font-weight: 900; color: var(--ink-soft); }
+  .area .chev { font-size: 18px; transition: transform .2s; }
+  .area[open] .chev { transform: rotate(180deg); }
+  .area.locked { opacity: .6; }
+  .area.locked .day { background: var(--lock); }
+  .rounds { display: grid; gap: 8px; padding: 0 14px 14px; }
+  .round {
+    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+    padding: 10px 12px; border: 3px solid var(--ink); border-radius: 14px; background: #F6FAFF; min-height: 52px;
+  }
+  .round .num { flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--ink); color: #fff; font-family: var(--display); font-size: 14px; display: flex; align-items: center; justify-content: center; }
+  .round .nm { flex: 1; font-weight: 900; font-size: 15px; }
+  .round .nm small { display: block; font-size: 11px; color: var(--ink-soft); }
+  .round .st { font-size: 18px; letter-spacing: 1px; color: #D7DDE6; white-space: nowrap; }
+  .round .st .on { color: #F5A300; }
+  .round.cleared { background: #FFFBE6; }
+  .round.next { background: #FFF1A8; box-shadow: 0 3px 0 var(--ink); }
+  .round.next .num { background: var(--berry); }
+  .round:disabled { background: #EEF1F5; color: #8C95A6; cursor: not-allowed; }
+  .round:disabled .num { background: var(--lock); }
+  .settings { margin-top: 24px; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+  .foot { text-align: center; font-size: 12px; color: var(--ink-soft); margin-top: 16px; }
+
+  /* ---------- quiz ---------- */
+  .qtop { display: flex; align-items: center; gap: 10px; }
+  .dots { flex: 1; display: flex; gap: 4px; }
+  .dots i { flex: 1; height: 12px; border-radius: 6px; border: 2px solid var(--ink); background: var(--paper); }
+  .dots i.ok { background: var(--ok); }
+  .dots i.ng { background: var(--ng); }
+  .dots i.now { background: var(--sun); }
+  .qhead { display: flex; align-items: flex-end; gap: 10px; margin-top: 12px; }
+  .qhead .mini { width: 92px; flex: none; position: relative; }
+  .qhead .mini svg { display: block; width: 100%; }
+  .qhead .bubble {
+    position: relative; flex: 1; background: var(--paper); border: 3px solid var(--ink); border-radius: 16px; padding: 8px 12px; margin-bottom: 18px;
+    font-weight: 900; font-size: 14px; min-height: 44px; display: flex; align-items: center;
+  }
+  .qhead .bubble::before { content: ""; position: absolute; left: -12px; bottom: 10px; border: 8px solid transparent; border-right: 10px solid var(--ink); }
+  .combo { position: absolute; top: -6px; right: -6px; background: var(--berry); color: #fff; border: 2px solid var(--ink); border-radius: 999px; font-family: var(--display); font-size: 11px; padding: 2px 7px; }
+  .plus { position: absolute; left: 50%; top: 20%; font-family: var(--display); color: var(--berry); font-size: 20px; pointer-events: none; animation: plus 1s ease-out forwards; text-shadow: 2px 2px 0 #fff; }
+  @keyframes plus { from { opacity: 1; transform: translate(-50%, 0) scale(.8); } to { opacity: 0; transform: translate(-50%, -48px) scale(1.2); } }
+
+  .qcard { margin-top: 2px; }
+  .qlabel { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .qlabel .tag { font-size: 12px; font-weight: 900; background: var(--ink); color: #fff; padding: 3px 10px; border-radius: 999px; }
+  .qlabel .kind { font-size: 13px; font-weight: 900; color: var(--ink-soft); }
+  .prompt { margin-top: 12px; font-size: 24px; line-height: 1.5; overflow-wrap: anywhere; min-height: 1.5em; }
+  .prompt.en { font-size: 26px; font-weight: 700; }
+  .prompt.word { font-size: 40px; text-align: center; padding-block: 8px; }
+  .prompt.jp { font-weight: 900; }
+  .prompt .blank { display: inline-block; min-width: 3.2em; border-bottom: 4px solid var(--berry); text-align: center; color: var(--berry); }
+  .prompt .blank.filled { color: var(--ok); border-color: var(--ok); padding-inline: 4px; }
+  .dlg { display: grid; gap: 8px; font-size: 21px; }
+  .dlg .ln { display: grid; grid-template-columns: 30px 1fr; gap: 8px; align-items: start; }
+  .dlg .who { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--ink); display: flex; align-items: center; justify-content: center; font-family: var(--en); font-weight: 700; font-size: 15px; background: #CFEFFF; margin-top: 2px; }
+  .dlg .ln.b .who { background: #FFD6E2; }
+  .listen-box { display: flex; flex-direction: column; align-items: center; gap: 10px; padding-block: 8px; }
+  .play-big {
+    width: 96px; height: 96px; border-radius: 50%; border: 4px solid var(--ink); background: var(--sun); box-shadow: 0 5px 0 var(--ink);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .play-big:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--ink); }
+  .play-big svg { width: 44px; height: 44px; }
+  .reveal { background: none; border: 0; text-decoration: underline; font-size: 13px; font-weight: 900; color: var(--ink-soft); }
+  .revealed { font-family: var(--en); font-size: 22px; font-weight: 700; }
+  .say-row { display: flex; justify-content: flex-end; margin-top: 6px; }
+
+  .opts { display: grid; gap: 10px; margin-top: 14px; }
+  .opt {
+    display: flex; align-items: center; gap: 12px; width: 100%; min-height: 58px; text-align: left;
+    padding: 10px 14px; border: 3px solid var(--ink); border-radius: 16px; background: var(--paper); box-shadow: 0 4px 0 var(--ink);
+    font-size: 19px; font-weight: 700; line-height: 1.3;
+  }
+  .opt.en { font-size: 20px; }
+  .opt:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+  .opt .mk { /* mark-sheet bubble */
+    flex: none; width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--ink);
+    display: flex; align-items: center; justify-content: center; font-family: var(--en); font-weight: 700; font-size: 16px; background: #fff;
+  }
+  .opt.correct { background: var(--ok-bg); border-color: var(--ok); }
+  .opt.correct .mk { background: var(--ok); color: #fff; border-color: var(--ok); }
+  .opt.wrong { background: var(--ng-bg); border-color: var(--ng); }
+  .opt.wrong .mk { background: var(--ng); color: #fff; border-color: var(--ng); }
+  .opt:disabled { cursor: default; color: var(--ink); }
+  .opt.dim { opacity: .5; }
+
+  .feedback {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+    padding: 14px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+    border-top: 3px solid var(--ink); background: var(--ok-bg);
+    animation: up .22s ease-out;
+  }
+  .feedback.ng { background: var(--ng-bg); }
+  .feedback .inner { max-width: 448px; margin: 0 auto; display: grid; gap: 8px; }
+  .feedback .res { display: flex; align-items: center; gap: 10px; font-family: var(--display); font-size: 22px; }
+  .feedback .res .mark { width: 40px; height: 40px; border-radius: 50%; border: 3px solid var(--ink); background: var(--paper); display: flex; align-items: center; justify-content: center; font-size: 20px; }
+  .feedback.ok .res { color: var(--ok); }
+  .feedback.ng .res { color: var(--ng); }
+  .feedback .ans { font-size: 15px; font-weight: 700; line-height: 1.5; }
+  .feedback .ans .en { font-size: 18px; }
+  .feedback .ex { font-size: 13px; font-weight: 700; color: var(--ink-soft); background: rgba(255,255,255,.7); border-radius: 10px; padding: 6px 10px; }
+  .feedback .acts { display: flex; gap: 10px; }
+  .feedback .acts .btn { flex: 1; }
+  @keyframes up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  .spacer { height: 240px; }
+
+  /* ---------- result ---------- */
+  .result { text-align: center; padding-top: 8px; }
+  .result h2 { font-size: 26px; }
+  .result .score { font-family: var(--display); font-size: 64px; line-height: 1; margin-top: 8px; font-variant-numeric: tabular-nums; }
+  .result .score small { font-size: 24px; color: var(--ink-soft); }
+  .result .stars { font-size: 40px; letter-spacing: 6px; color: #D7DDE6; margin-top: 6px; }
+  .result .stars .on { color: #F5A300; display: inline-block; animation: pop .4s backwards; }
+  .result .stars .on:nth-child(2) { animation-delay: .15s; }
+  .result .stars .on:nth-child(3) { animation-delay: .3s; }
+  @keyframes pop { from { transform: scale(0); } 60% { transform: scale(1.3); } to { transform: scale(1); } }
+  .result .msg { font-weight: 900; margin-top: 8px; }
+  .result .mon { width: 180px; margin: 6px auto 0; }
+  .result .gain { margin-top: 8px; text-align: left; }
+  .result .acts { display: grid; gap: 10px; margin-top: 16px; }
+  .miss-list { margin-top: 14px; text-align: left; }
+  .miss-list h3 { font-size: 15px; margin-bottom: 6px; }
+  .miss-list ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .miss-list li { background: var(--paper); border: 2px solid var(--ink); border-radius: 12px; padding: 8px 10px; font-size: 14px; font-weight: 700; }
+  .miss-list li .en { font-size: 16px; }
+  .miss-list li small { display: block; color: var(--ink-soft); }
+
+  /* ---------- overlays ---------- */
+  .overlay { position: fixed; inset: 0; z-index: 50; background: rgba(31,42,68,.82); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .overlay .panel { width: 100%; max-width: 420px; max-height: 100%; overflow-y: auto; text-align: center; }
+  .evo-stage { position: relative; width: 220px; height: 220px; margin: 8px auto; }
+  .evo-stage > div { position: absolute; inset: 0; }
+  .evo-stage .old { animation: flickA 2.4s steps(1) forwards; }
+  .evo-stage .new { animation: flickB 2.4s steps(1) forwards; }
+  .evo-stage .new svg, .evo-stage .old svg { width: 100%; height: 100%; }
+  @keyframes flickA { 0%{opacity:1} 20%{opacity:0} 30%{opacity:1} 45%{opacity:0} 52%{opacity:1} 62%{opacity:0} 67%{opacity:1} 75%{opacity:0} 78%{opacity:1} 84%{opacity:0} 100%{opacity:0} }
+  @keyframes flickB { 0%{opacity:0} 20%{opacity:1} 30%{opacity:0} 45%{opacity:1} 52%{opacity:0} 62%{opacity:1} 67%{opacity:0} 75%{opacity:1} 78%{opacity:0} 84%{opacity:1} 100%{opacity:1} }
+  .evo-flash { position: absolute; inset: -20px; border-radius: 50%; background: radial-gradient(circle, #fff 0 30%, rgba(255,210,63,.6) 50%, transparent 70%); animation: flash 2.4s forwards; pointer-events: none; }
+  @keyframes flash { 0%,80% { opacity: 0; transform: scale(.6); } 86% { opacity: 1; transform: scale(1.2); } 100% { opacity: 0; transform: scale(1.4); } }
+  .evo-text { min-height: 3.2em; font-weight: 900; font-size: 17px; line-height: 1.6; }
+  .evo-text b { font-family: var(--display); font-weight: 400; color: var(--berry); }
+  .cert { background: #FFFBEA; }
+  .cert .ribbon { font-family: var(--display); font-size: 13px; letter-spacing: .1em; background: var(--berry); color: #fff; display: inline-block; padding: 4px 14px; border-radius: 999px; }
+  .cert h2 { font-size: 26px; margin-top: 10px; }
+  .cert .mon { width: 180px; margin: 0 auto; }
+  .cert p { font-weight: 700; line-height: 1.7; }
+
+  .zukan { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+  .zukan .cell { border: 2px solid var(--ink); border-radius: 12px; padding: 4px; background: #F6FAFF; font-size: 11px; font-weight: 900; }
+  .zukan .cell.unknown svg { filter: brightness(0) opacity(.25); }
+  .zukan .cell small { display: block; color: var(--ink-soft); font-weight: 700; }
+
+  /* monster animation */
+  .msvg { display: block; width: 100%; height: auto; overflow: visible; }
+  .idle .body-g { animation: breathe 2.6s ease-in-out infinite; transform-origin: 100px 186px; }
+  .idle .egg { animation: wobble 2.2s ease-in-out infinite; transform-origin: 100px 186px; }
+  .jump .body-g, .jump .egg { animation: jump .6s ease-out; transform-origin: 100px 186px; }
+  .shake .body-g, .shake .egg { animation: shake .5s; transform-origin: 100px 186px; }
+  @keyframes breathe { 0%,100% { transform: scale(1, 1); } 50% { transform: scale(1.03, .97); } }
+  @keyframes wobble { 0%,70%,100% { transform: rotate(0); } 78% { transform: rotate(-6deg); } 86% { transform: rotate(6deg); } 94% { transform: rotate(-3deg); } }
+  @keyframes jump { 0% { transform: translateY(0) scale(1.1, .9); } 40% { transform: translateY(-26px) scale(.95, 1.05); } 70% { transform: translateY(0) scale(1.08, .92); } 100% { transform: none; } }
+  @keyframes shake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-6px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(4px); } }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ============ START ============ -->
+  <section id="scr-start" hidden>
+    <div class="logo">
+      <span class="kicker">英検5級 7日間チャレンジ</span>
+      <h1>えいけん<br>モンスター牧場</h1>
+      <p>もんだいに せいかいすると モンスターが そだつよ！</p>
+    </div>
+    <div class="panel">
+      <h2 style="font-size:17px">そだてる たまごを えらんでね</h2>
+      <div class="eggs" id="eggs" role="group" aria-label="たまごをえらぶ"></div>
+      <div class="field">
+        <label for="nick">なまえを つけよう（なくてもOK）</label>
+        <input id="nick" maxlength="10" placeholder="れい：ぽんた" autocomplete="off">
+      </div>
+      <button class="btn pink start-go" id="start-go" disabled>この たまごに きめた！</button>
+    </div>
+    <div class="panel plan">
+      <h3>7日で ぜんクリ プラン（1日 30ぷん）</h3>
+      <ol>
+        <li>たんご①（どうぶつ・いろ・たべもの）</li>
+        <li>たんご②（がっこう・ようび・うごき）</li>
+        <li>ぶんぽう（am/is/are・do/does・can）</li>
+        <li>ぎもんし（What・Where・How many）</li>
+        <li>かいわ（あいさつ・こたえかた）</li>
+        <li>ならべかえ・リスニング</li>
+        <li>もぎテスト → ラスボス！</li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ============ HOME ============ -->
+  <section id="scr-home" hidden>
+    <div class="topbar">
+      <div class="grow">
+        <div class="mon-name" id="h-name"></div>
+        <div class="mon-sub" id="h-sub"></div>
+      </div>
+      <button class="icon-btn" id="h-sound" aria-label="おとの オン・オフ"></button>
+    </div>
+
+    <div class="ranch">
+      <div class="sunball" aria-hidden="true"></div>
+      <div class="say-bubble" id="h-say"></div>
+      <div class="mon-wrap"><button id="h-mon" aria-label="モンスターを なでる"></button></div>
+      <div class="evo-bar">
+        <div class="row"><span>せいかい <b id="h-correct">0</b> もん</span><span id="h-next"></span></div>
+        <div class="meter"><i id="h-meter" style="width:0"></i></div>
+        <div class="evo-steps" id="h-steps"></div>
+      </div>
+    </div>
+
+    <div class="panel today">
+      <h2>きょうの れんしゅう</h2>
+      <div class="mins"><span id="h-min">0</span><small> / 30ぷん</small></div>
+      <div class="meter sunny"><i id="h-tmeter" style="width:0"></i></div>
+      <div class="note" id="h-note"></div>
+    </div>
+
+    <div class="tools">
+      <button class="btn pink" id="h-review">にがて たいじ <span class="count" id="h-wcount">0</span></button>
+      <button class="btn white" id="h-zukan">しんか ずかん</button>
+    </div>
+
+    <div class="map-title">ぼうけんマップ <small id="h-progress"></small></div>
+    <div id="map"></div>
+
+    <div class="settings">
+      <button class="btn white small" id="h-reset">さいしょから やりなおす</button>
+    </div>
+    <p class="foot">しんかは せいかい 5・40・110・200・320もん で おこるよ</p>
+  </section>
+
+  <!-- ============ QUIZ ============ -->
+  <section id="scr-quiz" hidden>
+    <div class="qtop">
+      <button class="icon-btn" id="q-quit" aria-label="やめる">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+      <div class="dots" id="q-dots"></div>
+      <button class="icon-btn" id="q-sound" aria-label="おとの オン・オフ"></button>
+    </div>
+    <div class="qhead">
+      <div class="mini" id="q-mon"></div>
+      <div class="bubble" id="q-bubble"></div>
+    </div>
+    <div class="panel qcard">
+      <div class="qlabel"><span class="tag" id="q-tag"></span><span class="kind" id="q-count"></span></div>
+      <div id="q-prompt"></div>
+    </div>
+    <div class="opts" id="q-opts"></div>
+    <div class="spacer"></div>
+  </section>
+
+  <!-- ============ RESULT ============ -->
+  <section id="scr-result" hidden>
+    <div class="panel result">
+      <h2 id="r-title"></h2>
+      <div class="score"><span id="r-score"></span><small id="r-total"></small></div>
+      <div class="stars" id="r-stars"></div>
+      <div class="msg" id="r-msg"></div>
+      <div class="mon" id="r-mon"></div>
+      <div class="gain">
+        <div class="evo-bar" style="border:0;padding:0">
+          <div class="row"><span>せいかい ごうけい <b id="r-correct"></b> もん</span><span id="r-next"></span></div>
+          <div class="meter"><i id="r-meter" style="width:0"></i></div>
+        </div>
+      </div>
+      <div class="acts" id="r-acts"></div>
+    </div>
+    <div class="miss-list" id="r-miss"></div>
+  </section>
+</div>
+
+<!-- evolution overlay -->
+<div class="overlay" id="ov-evo" hidden>
+  <div class="panel">
+    <div class="evo-stage" id="evo-stage"></div>
+    <div class="evo-text" id="evo-text"></div>
+    <button class="btn pink" id="evo-ok" hidden style="width:100%">やったー！</button>
+  </div>
+</div>
+
+<!-- zukan overlay -->
+<div class="overlay" id="ov-zukan" hidden>
+  <div class="panel">
+    <h2 style="font-size:20px">しんか ずかん</h2>
+    <div class="zukan" id="zukan"></div>
+    <button class="btn white" id="zukan-close" style="width:100%;margin-top:14px">とじる</button>
+  </div>
+</div>
+
+<!-- confirm overlay -->
+<div class="overlay" id="ov-confirm" hidden>
+  <div class="panel">
+    <h2 style="font-size:19px" id="cf-title"></h2>
+    <p style="font-weight:700" id="cf-body"></p>
+    <div style="display:grid;gap:10px">
+      <button class="btn pink" id="cf-yes"></button>
+      <button class="btn white" id="cf-no">やめる</button>
+    </div>
+  </div>
+</div>
+
+<!-- ending overlay -->
+<div class="overlay" id="ov-end" hidden>
+  <div class="panel cert">
+    <span class="ribbon">ぜんクリ しょうめいしょ</span>
+    <h2>ラスボス げきは！</h2>
+    <div class="mon" id="end-mon"></div>
+    <p id="end-text"></p>
+    <button class="btn pink" id="end-ok" style="width:100%">マップに もどる</button>
+  </div>
+</div>
+
+<div id="feedback-root"></div>
+
+<script>
+/* =========================================================
+   もんだいデータ（英検5級で よく出る単語・文法・会話）
+   ========================================================= */
+const VOCAB = {
+animal: `dog=いぬ;cat=ねこ;bird=とり;rabbit=うさぎ;horse=うま;bear=くま;lion=ライオン;tiger=トラ;monkey=さる;elephant=ぞう;fish=さかな;pig=ぶた;cow=うし;panda=パンダ;mouse=ねずみ;frog=かえる`,
+color: `red=あか;blue=あお;yellow=きいろ;green=みどり;white=しろ;black=くろ;pink=ピンク;purple=むらさき;brown=ちゃいろ`,
+number: `five=5;eight=8;nine=9;eleven=11;twelve=12;thirteen=13;fifteen=15;twenty=20;thirty=30;forty=40;fifty=50;one hundred=100`,
+food: `apple=りんご;banana=バナナ;egg=たまご;milk=ぎゅうにゅう;bread=パン;rice=ごはん・おこめ;cake=ケーキ;juice=ジュース;water=みず;tea=おちゃ;sandwich=サンドイッチ;soup=スープ;strawberry=いちご;potato=じゃがいも;breakfast=あさごはん;lunch=ひるごはん;dinner=ゆうごはん;cookie=クッキー`,
+family: `mother=おかあさん;father=おとうさん;sister=あね・いもうと;brother=あに・おとうと;grandmother=おばあさん;grandfather=おじいさん;friend=ともだち;teacher=せんせい;student=せいと・がくせい;boy=おとこのこ;girl=おんなのこ;baby=あかちゃん`,
+body: `head=あたま;hand=て;eye=め;ear=みみ;nose=はな（かおの）;mouth=くち;foot=あし;hair=かみのけ;face=かお`,
+school: `book=ほん;pencil=えんぴつ;eraser=けしゴム;notebook=ノート;desk=つくえ;chair=いす;bag=かばん;classroom=きょうしつ;English=えいご;math=さんすう;science=りか;music=おんがく;P.E.=たいいく;art=ずこう・びじゅつ;homework=しゅくだい;ruler=じょうぎ;dictionary=じしょ;library=としょかん`,
+day: `Sunday=にちようび;Monday=げつようび;Tuesday=かようび;Wednesday=すいようび;Thursday=もくようび;Friday=きんようび;Saturday=どようび`,
+month: `January=1がつ;February=2がつ;March=3がつ;April=4がつ;May=5がつ;June=6がつ;July=7がつ;August=8がつ;September=9がつ;October=10がつ;November=11がつ;December=12がつ`,
+season: `spring=はる;summer=なつ;fall=あき;winter=ふゆ;morning=あさ;afternoon=ごご;night=よる;today=きょう;week=しゅう（1しゅうかん）;year=とし（1ねん）;sunny=はれの;rainy=あめの;cloudy=くもりの;snowy=ゆきの`,
+sport: `soccer=サッカー;baseball=やきゅう;tennis=テニス;basketball=バスケットボール;volleyball=バレーボール;swimming=すいえい;piano=ピアノ;guitar=ギター;song=うた;movie=えいが`,
+place: `house=いえ;park=こうえん;zoo=どうぶつえん;station=えき;hospital=びょういん;store=おみせ;kitchen=だいどころ;room=へや;garden=にわ;pool=プール;river=かわ;mountain=やま;sea=うみ`,
+thing: `bike=じてんしゃ;car=くるま;bus=バス;train=でんしゃ;clock=とけい;umbrella=かさ;cap=ぼうし;shoes=くつ;window=まど;door=ドア;box=はこ;cup=カップ;flower=お花;computer=コンピューター;camera=カメラ`,
+verb: `play=（スポーツを）する・あそぶ;eat=たべる;drink=のむ;like=すきだ;have=もっている;go=いく;come=くる;study=べんきょうする;read=よむ;write=（字を）かく;draw=（絵を）かく;swim=およぐ;run=はしる;cook=りょうりする;watch=（テレビを）みる;listen=きく;speak=はなす;sing=うたう;dance=おどる;walk=あるく;sleep=ねむる;open=あける;close=しめる;wash=あらう;clean=そうじする;make=つくる;help=てつだう;use=つかう;want=ほしい;know=しっている;live=すむ;buy=かう;sit=すわる;stand=たつ;get up=おきる;teach=おしえる;jump=ジャンプする`,
+adj: `big=おおきい;small=ちいさい;tall=せがたかい;long=ながい;short=みじかい;new=あたらしい;old=ふるい・としをとった;happy=うれしい;sad=かなしい;cute=かわいい;beautiful=うつくしい;busy=いそがしい;hungry=おなかがすいた;sleepy=ねむい;hot=あつい;cold=さむい・つめたい;fast=はやい;young=わかい;favorite=いちばんすきな;fine=げんきな;easy=かんたんな;difficult=むずかしい`
+};
+
+/* もんだい | せいかい | まちがい1 | まちがい2 | まちがい3 | やく | ポイント */
+const HQ = {
+g1: `I ( ) a student.|am|is|are|be|わたしは せいとです。|I のときは am
+She ( ) my sister.|is|am|are|be|かのじょは わたしの しまいです。|He / She / 1人・1つ のときは is
+They ( ) from Canada.|are|is|am|be|かれらは カナダ しゅっしんです。|They / We / You のときは are
+My name ( ) Ken.|is|am|are|be|わたしの なまえは ケンです。|My name は 1つなので is
+We ( ) good friends.|are|is|am|be|わたしたちは なかよしです。|We は are
+( ) you hungry? — Yes, I am.|Are|Is|Am|Do|おなか すいてる？ — うん。|You のときは Are で きく
+( ) this your pencil? — Yes, it is.|Is|Are|Am|Do|これは あなたの えんぴつ？ — そうだよ。|this は 1つなので Is
+Tom and I ( ) in the same class.|are|is|am|be|トムと わたしは おなじ クラスです。|2人いるので are
+The books ( ) on the desk.|are|is|am|be|ほんは つくえの うえに あります。|books は 2さつ以上なので are
+It ( ) sunny today.|is|are|am|be|きょうは はれです。|It のときは is
+Are you a teacher? — No, I'm ( ).|not|no|don't|isn't|あなたは せんせいですか？ — いいえ、ちがいます。|I'm not ＝ I am not
+This ( ) my dog, Pochi.|is|are|am|be|これは わたしの いぬの ポチです。|This は is
+Where ( ) your shoes?|are|is|am|do|あなたの くつは どこ？|shoes は 2つで1足（ふくすう）なので are
+My father ( ) a doctor.|is|are|am|do|わたしの ちちは いしゃです。|My father は 1人なので is`,
+g2: `( ) you like cats? — Yes, I do.|Do|Does|Are|Is|ねこは すき？ — うん、すき。|you の いっぱんどうしの しつもんは Do
+( ) your brother play soccer? — Yes, he does.|Does|Do|Is|Are|おにいさんは サッカーを する？ — うん、するよ。|he / she / 1人のときは Does
+I ( ) have a dog.|don't|doesn't|am not|isn't|わたしは いぬを かっていません。|I の うちけしは don't
+Kenta ( ) like milk.|doesn't|don't|isn't|aren't|ケンタは ぎゅうにゅうが すきでは ありません。|1人（Kenta）の うちけしは doesn't
+Do you play the piano? — No, I ( ).|don't|doesn't|am not|not|ピアノを ひく？ — ううん、ひかない。|Do で きかれたら do / don't で こたえる
+Does Emi have a bike? — Yes, she ( ).|does|do|is|has|エミは じてんしゃを もってる？ — うん。|Does で きかれたら does で こたえる
+What ( ) you do on Sundays?|do|does|are|is|にちようびは なにを するの？|you の いっぱんどうしは do
+What ( ) your mother like?|does|do|is|are|おかあさんは なにが すき？|your mother は 1人なので does
+( ) they live in Tokyo? — Yes, they do.|Do|Does|Are|Is|かれらは とうきょうに すんでる？ — うん。|they は Do
+Does your cat like fish? — No, it ( ).|doesn't|don't|isn't|not|ねこは さかなが すき？ — ううん。|it も does / doesn't
+We ( ) go to school on Saturdays.|don't|doesn't|aren't|isn't|わたしたちは どようびは がっこうに いきません。|We の うちけしは don't`,
+g3: `My sister ( ) tennis every day.|plays|play|playing|is play|あねは まいにち テニスを します。|1人のときは どうしに s を つける
+He ( ) to school by bus.|goes|go|going|gos|かれは バスで がっこうへ いきます。|go は goes になる
+Mary ( ) English very well.|speaks|speak|speaking|is speak|メアリーは えいごを とても じょうずに はなします。|1人なので speaks
+My father ( ) TV after dinner.|watches|watch|watchs|watching|ちちは ゆうごはんの あと テレビを みます。|watch は watches になる
+Ken ( ) a new bike.|has|have|haves|having|ケンは あたらしい じてんしゃを もっています。|have は has になる
+I ( ) soccer with my friends.|play|plays|playing|is play|わたしは ともだちと サッカーを します。|I のときは s を つけない
+She ( ) her homework in the evening.|does|do|dos|doing|かのじょは ゆうがたに しゅくだいを します。|do は does になる
+Tom ( ) up at six every morning.|gets|get|getting|is get|トムは まいあさ 6じに おきます。|1人なので gets
+My mother ( ) dinner.|cooks|cook|cooking|cookes|ははは ゆうごはんを つくります。|1人なので cooks
+Lisa and Ben ( ) in the park.|run|runs|running|is run|リサと ベンは こうえんで はしります。|2人なので s を つけない
+My brother ( ) math.|studies|study|studys|studying|あには すうがくを べんきょうします。|study は studies になる`,
+g4: `Look! The cat is ( ) on the bed.|sleeping|sleep|sleeps|slept|みて！ ねこが ベッドで ねているよ。|is ＋ 〜ing で「〜している」
+I'm ( ) a book now.|reading|read|reads|to read|わたしは いま ほんを よんでいます。|am ＋ 〜ing
+What are you ( )? — I'm making a cake.|doing|do|does|did|なにを しているの？ — ケーキを つくっているよ。|are ＋ 〜ing で いま していること
+My mother is ( ) in the kitchen.|cooking|cook|cooks|cooked|ははは だいどころで りょうりを しています。|is ＋ 〜ing
+They ( ) swimming in the pool now.|are|is|am|do|かれらは いま プールで およいでいます。|They なので are ＋ 〜ing
+( ) Tom playing the guitar? — Yes, he is.|Is|Are|Does|Do|トムは ギターを ひいているの？ — うん。|〜ing の しつもんは Is / Are で はじめる
+The children are ( ) in the park.|running|runing|run|runs|こどもたちは こうえんで はしっています。|run は n を かさねて running
+What is Emi doing? — She is ( ) a letter.|writing|write|writes|writting|エミは なにを しているの？ — てがみを かいているよ。|write は e を とって writing
+Listen! Ken is ( ) a song.|singing|sing|sings|sang|きいて！ ケンが うたを うたっているよ。|is ＋ 〜ing
+We ( ) watching TV now.|are|is|am|be|わたしたちは いま テレビを みています。|We なので are`,
+g5: `Can you swim? — Yes, I ( ).|can|do|am|does|およげる？ — うん、およげるよ。|Can で きかれたら can で こたえる
+My sister can ( ) the piano.|play|plays|playing|to play|いもうとは ピアノを ひけます。|can の あとは どうしの もとの かたち
+( ) you ski? — No, I can't.|Can|Do|Are|Is|スキーは できる？ — ううん、できない。|こたえが can't なので Can
+( ) I use your pencil? — Sure.|Can|Do|Am|Are|えんぴつを つかっても いい？ — いいよ。|Can I 〜? で「〜しても いい？」
+( ) quiet in the library.|Be|Is|Are|Am|としょかんでは しずかに しなさい。|めいれいぶんは Be で はじめる
+( ) play soccer after school. — Yes, let's.|Let's|Let|Please|Do|ほうかごに サッカーを しよう。 — うん、しよう。|Let's 〜. で「〜しよう」
+Please ( ) the window.|open|opens|opening|to open|まどを あけてください。|Please の あとは もとの かたち
+( ) run here.|Don't|Doesn't|Not|No|ここで はしっては いけません。|Don't 〜. で「〜しては いけない」
+Kumi can ( ) very fast.|run|runs|running|ran|クミは とても はやく はしれます。|can の あとは もとの かたち
+( ) sit down, Tom.|Please|Let's|Can|Do|すわってください、トム。|Please 〜. で「〜してください」
+Let's ( ) lunch.|eat|eats|eating|to eat|おひるごはんを たべよう。|Let's の あとは もとの かたち
+Can your dog ( )?|swim|swims|swimming|swam|あなたの いぬは およげるの？|Can の あとは もとの かたち`,
+g6: `This is my sister. ( ) name is Aki.|Her|She|His|Hers|これは わたしの いもうとです。かのじょの なまえは アキです。|「かのじょの」は Her
+I have a brother. I like ( ) very much.|him|he|his|they|わたしには おとうとが います。かれが だいすきです。|「かれを」は him
+Is this Ken's bag? — Yes, it's ( ) bag.|his|he|him|her|これは ケンの かばん？ — うん、かれの かばんだよ。|「かれの」は his
+Whose pen is this? — It's ( ).|mine|my|me|I|これは だれの ペン？ — わたしのだよ。|「わたしのもの」は mine
+Mr. Brown is ( ) teacher. He teaches us English.|our|we|us|ours|ブラウンせんせいは わたしたちの せんせいです。|「わたしたちの」は our
+( ) are my friends, Ken and Yuki.|They|He|She|It|かれらは わたしの ともだちの ケンと ユキです。|2人なので They
+We go to school ( ) Monday to Friday.|from|at|in|of|わたしたちは げつようびから きんようびまで がっこうへ いきます。|from A to B で「AからBまで」
+My birthday is ( ) May.|in|on|at|of|わたしの たんじょうびは 5がつです。|つきの まえは in
+I get up ( ) seven.|at|in|on|of|わたしは 7じに おきます。|じこくの まえは at
+We have music class ( ) Friday.|on|in|at|of|きんようびに おんがくの じゅぎょうが あります。|ようびの まえは on
+The cat is ( ) the table. It's sleeping there.|under|of|to|for|ねこは テーブルの したに います。そこで ねています。|under ＝ 〜の したに
+I play tennis ( ) my father.|with|of|to|at|わたしは ちちと テニスを します。|with ＝ 〜と いっしょに
+I study English ( ) the evening.|in|on|at|to|わたしは ゆうがたに えいごを べんきょうします。|in the morning / in the evening`,
+w1: `( ) is that? — It's a hospital.|What|Who|Where|When|あれは なに？ — びょういんだよ。|もの を きくときは What
+( ) is that boy? — He's my brother.|Who|What|Where|How|あの おとこのこは だれ？ — わたしの おとうとだよ。|ひと を きくときは Who
+( ) bag is this? — It's Yumi's.|Whose|Who|What|Where|これは だれの かばん？ — ユミのだよ。|「だれの」は Whose
+( ) do you like, dogs or cats? — I like dogs.|Which|Who|Where|When|いぬと ねこ、どっちが すき？ — いぬが すき。|「どっち」は Which
+( ) color do you like? — I like blue.|What|Who|Where|How|なにいろが すき？ — あおが すき。|What color ＝ なにいろ
+( ) is your favorite singer?|Who|What|Where|When|あなたの いちばん すきな かしゅは だれ？|ひと なので Who
+What ( ) do you like? — I like soccer.|sport|food|color|animal|なんの スポーツが すき？ — サッカーが すき。|サッカー は sport
+What ( ) is it today? — It's Monday.|day|time|month|color|きょうは なんようび？ — げつようびだよ。|What day ＝ なんようび
+What ( ) is it now? — It's three o'clock.|time|day|color|year|いま なんじ？ — 3じだよ。|What time ＝ なんじ
+Whose shoes are these? — They're ( ).|my brother's|my brother|me|I|これは だれの くつ？ — おにいちゃんのだよ。|「〜の もの」は 's を つける
+What ( ) is this? — It's red.|color|time|day|sport|これは なにいろ？ — あかだよ。|red は color
+Who is that woman? — ( ) is my aunt.|She|He|It|They|あの じょせいは だれ？ — わたしの おばだよ。|woman（じょせい）は She`,
+w2: `( ) is my cap? — It's on the bed.|Where|When|What|Who|わたしの ぼうしは どこ？ — ベッドの うえだよ。|ばしょ を きくときは Where
+( ) is your birthday? — It's July 5th.|When|Where|Who|Which|たんじょうびは いつ？ — 7がつ5かだよ。|「いつ」は When
+( ) do you go to school? — By bike.|How|What|Who|Where|どうやって がっこうへ いくの？ — じてんしゃで。|「どうやって」は How
+( ) are you? — I'm fine, thank you.|How|What|Who|Where|げんき？ — げんきだよ、ありがとう。|How are you? は あいさつ
+( ) do you live? — I live in Osaka.|Where|When|What|How|どこに すんでいるの？ — おおさかだよ。|ばしょ なので Where
+( ) do you play tennis? — On Sundays.|When|Where|Who|Whose|いつ テニスを するの？ — にちようびだよ。|「いつ」は When
+How is the weather today? — It's ( ).|rainy|rain|Monday|five|きょうの てんきは どう？ — あめだよ。|It's rainy. / It's sunny.
+Where is Tom? — He's ( ) the library.|in|of|for|with|トムは どこ？ — としょかんに いるよ。|in ＝ 〜の なかに
+( ) do you study English? — At school.|Where|Who|What|Whose|どこで えいごを べんきょうするの？ — がっこうだよ。|At school は ばしょ なので Where`,
+w3: `How ( ) pencils do you have? — I have five.|many|much|old|long|えんぴつを なんぼん もってる？ — 5ほんだよ。|かず は How many
+How ( ) is this cap? — It's 800 yen.|much|many|old|long|この ぼうしは いくら？ — 800えんだよ。|ねだん は How much
+How ( ) are you? — I'm ten years old.|old|many|much|tall|なんさい？ — 10さいだよ。|とし は How old
+How ( ) is your brother? — He's 150 centimeters.|tall|old|much|many|おにいさんの せの たかさは？ — 150センチだよ。|せの たかさ は How tall
+How many ( ) do you have? — I have two.|dogs|dog|a dog|the dog|いぬを なんびき かってる？ — 2ひきだよ。|How many の あとは s を つける
+How old is your sister? — She's ( ).|twelve|twelve yen|twelve pencils|twelve o'clock|おねえさんは なんさい？ — 12さいだよ。|とし は かず だけで いえる
+How much is this pen? — ( ) 100 yen.|It's|They're|I'm|He's|この ペンは いくら？ — 100えんだよ。|ペン1本は It's
+How ( ) brothers do you have? — I have one.|many|much|old|tall|きょうだいは なんにん？ — 1人だよ。|かず は How many`,
+w4: `What time do you get up? — I get up ( ) six thirty.|at|on|in|for|なんじに おきるの？ — 6じ30ぷんに おきるよ。|じこくは at
+What time is it? — It's ( ).|seven fifteen|Sunday|May|sunny|いま なんじ？ — 7じ15ふんだよ。|What time には じかんで こたえる
+What day is it today? — It's ( ).|Friday|March|ten o'clock|rainy|きょうは なんようび？ — きんようびだよ。|What day には ようびで こたえる
+What's the date today? — It's April ( ).|tenth|ten o'clock|Tuesday|spring|きょうは なんにち？ — 4がつ10かだよ。|ひづけは tenth（10ばんめ）
+What do you do after school? — I ( ) soccer.|play|am|is|does|ほうかごは なにを するの？ — サッカーを するよ。|I play soccer.
+What does your father do? — He's a ( ).|doctor|hospital|school|park|おとうさんの しごとは？ — いしゃだよ。|What does 〜 do? は しごとを きく
+What are you doing? — I'm ( ) TV.|watching|watch|watches|to watch|なにを しているの？ — テレビを みているよ。|I'm ＋ 〜ing`,
+x: `What ( ) do you like? — I like winter.|season|sport|color|food|どの きせつが すき？ — ふゆが すき。|winter は season（きせつ）
+I play ( ) every Sunday. It's my favorite sport.|tennis|milk|pencil|dinner|まいしゅう にちようびに テニスを します。|sport なので tennis
+My mother ( ) a cake for my birthday.|makes|drinks|opens|sleeps|ははは わたしの たんじょうびに ケーキを つくります。|make ＝ つくる
+It's very ( ) today. Let's go swimming.|hot|cold|snowy|sleepy|きょうは とても あつい。およぎに いこう。|hot ＝ あつい
+I'm ( ). Let's eat lunch.|hungry|sleepy|tall|sad|おなかが すいた。おひるを たべよう。|hungry ＝ おなかが すいた
+Please ( ) your name here.|write|eat|swim|sing|ここに なまえを かいてください。|write ＝ かく
+My grandfather is 80 years ( ).|old|long|tall|big|そふは 80さいです。|〜 years old ＝ 〜さい
+January is the first ( ) of the year.|month|week|day|time|1がつは 1ねんの さいしょの つきです。|month ＝ つき
+A ( ) has seven days.|week|month|year|hour|1しゅうかんは 7にちです。|week ＝ しゅう
+Emi ( ) to music every night.|listens|looks|sees|watches|エミは まいばん おんがくを ききます。|listen to 〜 ＝ 〜を きく
+I wash my hands before ( ).|lunch|kitchen|window|pencil|わたしは おひるの まえに てを あらいます。|lunch ＝ おひるごはん
+We go to the ( ) to read books.|library|pool|station|kitchen|わたしたちは ほんを よみに としょかんへ いきます。|library ＝ としょかん
+Mr. Kato ( ) math at my school.|teaches|studies|plays|reads|かとうせんせいは わたしの がっこうで すうがくを おしえています。|teach ＝ おしえる
+Let's go to the ( ). We can see lions and elephants.|zoo|library|hospital|station|どうぶつえんに いこう。ライオンや ぞうが みられるよ。|zoo ＝ どうぶつえん
+My father ( ) the newspaper every morning.|reads|eats|runs|sings|ちちは まいあさ しんぶんを よみます。|read ＝ よむ
+It's rainy. Take your ( ).|umbrella|cap|desk|chair|あめだよ。かさを もっていってね。|umbrella ＝ かさ
+What's the ( ) today? — It's sunny.|weather|time|date|name|きょうの てんきは？ — はれだよ。|weather ＝ てんき
+My sister ( ) very well. She is a singer.|sings|cooks|swims|draws|あねは うたが とても じょうずです。かしゅです。|singer ＝ かしゅ
+In Japan, school starts in ( ).|April|June|October|December|にほんでは がっこうは 4がつに はじまります。|April ＝ 4がつ
+Kenji ( ) his bike to the park.|rides|drinks|eats|speaks|ケンジは じてんしゃに のって こうえんへ いきます。|ride ＝ のる
+I'm ( ). Good night.|sleepy|hungry|fast|tall|ねむいよ。おやすみ。|sleepy ＝ ねむい
+Tom can speak Japanese and ( ).|English|Monday|milk|morning|トムは にほんごと えいごが はなせます。|English ＝ えいご
+My brother ( ) his room every Sunday.|cleans|drinks|sings|sleeps|あには まいしゅう にちようびに じぶんの へやを そうじします。|clean ＝ そうじする
+I like ( ). My favorite is strawberries.|fruit|sports|music|animals|わたしは くだものが すき。いちごが いちばん すき。|strawberry は fruit（くだもの）`,
+c1: `A: Hello, I'm Mika. Nice to meet you. / B: ( )|Nice to meet you, too.|Good morning.|See you.|You're welcome.|こちらこそ、よろしくね。|Nice to meet you. には too を つけて かえす
+A: How are you? / B: ( )|I'm fine, thank you.|I'm ten.|I'm Ken.|Yes, I am.|げんきだよ、ありがとう。|How are you? は「げんき？」
+A: Thank you. / B: ( )|You're welcome.|Thank you.|Nice to meet you.|I'm sorry.|どういたしまして。|Thank you. には You're welcome.
+A: Goodbye, Tom. / B: ( )|See you tomorrow.|Good morning.|How are you?|Here you are.|また あしたね。|わかれの あいさつ
+A: I'm sorry. I'm late. / B: ( )|That's OK.|Thank you.|Yes, I do.|Me, too.|だいじょうぶだよ。|I'm sorry. には That's OK.
+A: Good night, Mom. / B: ( )|Good night.|Good morning.|Nice to meet you.|You're welcome.|おやすみ。|Good night. には Good night.
+A: Excuse me. Are you Ms. Green? / B: ( )|Yes, I am.|Yes, you are.|No, I don't.|No, it isn't.|はい、そうです。|Are you 〜? には I am で こたえる
+A: Happy birthday! This is for you. / B: ( )|Thank you.|You're welcome.|See you.|Good night.|ありがとう。|プレゼントを もらったら Thank you.
+A: Have a nice weekend! / B: ( )|You, too.|Yes, I do.|I'm fine.|Good morning.|あなたもね。|You, too. ＝ あなたもね
+A: Let's play baseball. / B: ( )|OK, let's.|Yes, I am.|No, it isn't.|You're welcome.|うん、やろう。|Let's 〜. には OK, let's. / Yes, let's.`,
+c2: `A: Can I use your eraser? / B: ( )|Sure. Here you are.|You're welcome.|Nice to meet you.|I'm fine.|いいよ。はい、どうぞ。|Here you are. ＝ はい、どうぞ
+A: Please open the door. / B: ( )|All right.|I'm eleven.|Good morning.|It's Monday.|わかった。|All right. ＝ わかった・いいよ
+A: Here's your tea. / B: ( )|Thank you.|Here you are.|Yes, it is.|Me, too.|ありがとう。|なにかを もらったら Thank you.
+A: Can you help me, Dad? / B: ( )|Sure.|Good night.|I'm Ken.|It's sunny.|いいよ。|Sure. ＝ もちろん
+A: Do you want some cookies? / B: ( )|Yes, please.|Yes, I am.|No, it isn't.|You're welcome.|うん、ちょうだい。|Yes, please. ＝ はい、おねがいします
+A: Let's go to the park. / B: ( )|Good idea.|You're welcome.|Me, too.|I'm fine.|いい かんがえだね。|Good idea. ＝ いいね
+A: Can I have some water? / B: ( )|Sure, here you are.|No, I'm not.|Good night.|I'm sorry, I'm late.|いいよ、はい どうぞ。|Can I have 〜? ＝ 〜を もらえる？
+A: Please sit down. / B: ( )|Thank you.|Good night.|I'm ten.|See you.|ありがとう。|すすめられたら Thank you.`,
+c3: `A: Do you like music? / B: ( ) I play the guitar.|Yes, I do.|No, I don't.|Yes, I am.|No, it isn't.|うん、すきだよ。ギターを ひくよ。|Do you 〜? には do で こたえる
+A: Is this your dog? / B: ( ) His name is Max.|Yes, it is.|No, I'm not.|Yes, I do.|No, they aren't.|うん、そうだよ。なまえは マックス。|Is this 〜? には it is で こたえる
+A: Where is your house? / B: ( )|It's near the station.|It's five o'clock.|It's Sunday.|It's my dog.|えきの ちかくだよ。|Where には ばしょで こたえる
+A: What time is it? / B: ( )|It's four o'clock.|It's Tuesday.|It's rainy.|It's my book.|4じだよ。|What time には じかんで こたえる
+A: Who is that girl? / B: ( )|She's my friend, Yuki.|She's ten.|It's a pen.|He's my father.|わたしの ともだちの ユキだよ。|Who には ひとで こたえる
+A: How many cats do you have? / B: ( )|I have two.|I'm twelve.|It's 100 yen.|At three.|2ひきだよ。|How many には かずで こたえる
+A: When do you practice the piano? / B: ( )|After dinner.|My mother.|It's mine.|Yes, I do.|ゆうごはんの あとだよ。|When には「いつ」で こたえる
+A: Whose notebook is this? / B: ( )|It's Mike's.|It's green.|It's on the desk.|It's two hundred yen.|マイクのだよ。|Whose には「だれの」で こたえる
+A: Are you hungry? / B: ( ) Let's eat lunch.|Yes, I am.|No, I don't.|Yes, I do.|Yes, it is.|うん。おひるを たべよう。|Are you 〜? には I am で こたえる
+A: What's your favorite subject? / B: ( )|I like science.|I'm a student.|It's my bag.|I go to school.|りかが すきだよ。|subject ＝ きょうか
+A: How do you go to the library? / B: ( )|I walk there.|It's big.|It's Friday.|On Sunday.|あるいて いくよ。|How には「どうやって」で こたえる
+A: Which do you like, tea or milk? / B: ( )|I like tea.|Yes, I do.|I'm fine.|At home.|おちゃが すき。|Which には どちらかを えらんで こたえる
+A: Is your brother a student? / B: ( ) He's a teacher.|No, he isn't.|Yes, he is.|No, he doesn't.|Yes, I am.|ううん、ちがうよ。せんせいだよ。|あとの「せんせいだよ」が ヒント`,
+c4: `A: ( ) / B: I'm eleven years old.|How old are you?|How are you?|What time is it?|Where are you from?|なんさい？|years old なので How old
+A: ( ) / B: It's on the table.|Where is my cap?|What is this?|Who is he?|When is the party?|わたしの ぼうしは どこ？|on the table は ばしょ
+A: ( ) / B: I'm from Australia.|Where are you from?|How are you?|What's your name?|How old are you?|どこの しゅっしん？|I'm from 〜 ＝ 〜 しゅっしんです
+A: ( ) / B: It's cloudy.|How is the weather?|What day is it?|How old is it?|Whose is it?|てんきは どう？|cloudy は てんき
+A: ( ) / B: My name is Emma.|What's your name?|How are you?|Who is he?|Where do you live?|なまえは なに？|My name is 〜
+A: ( ) / B: I like pizza.|What food do you like?|What sport do you play?|Where do you eat?|How many do you have?|なんの たべものが すき？|pizza は food
+A: ( ) / B: I play video games.|What do you do on Sundays?|Where is your room?|Who is your friend?|When is your birthday?|にちようびは なにを するの？|すること を こたえている
+A: ( ) / B: It's 500 yen.|How much is this book?|How many books do you have?|What time is it?|How old is this book?|この ほんは いくら？|yen は ねだん
+A: ( ) / B: Yes, I can.|Can you cook?|Do you cook?|Are you a cook?|Is it cooking?|りょうりは できる？|I can で こたえるのは Can
+A: ( ) / B: It's Wednesday.|What day is it today?|What time is it?|What's the date?|How is the weather?|きょうは なんようび？|Wednesday は ようび`,
+c5: `A: Is this your umbrella, Ken? / B: No. ( ) is blue.|Mine|My|Me|I|ケン、これは きみの かさ？ — ちがうよ。ぼくのは あおだよ。|Mine ＝ ぼくのもの
+A: Where are you going, Jim? / B: ( )|To the park, Mom.|At seven.|It's sunny.|Yes, I am.|こうえんだよ、ママ。|Where には ばしょで こたえる
+A: What are you drawing? / B: ( )|A bird in the tree.|Yes, I'm drawing.|With a pencil.|In the classroom.|きの うえの とりだよ。|What には「なに」で こたえる
+A: I like cats. / B: ( ) I have two cats.|Me, too.|You're welcome.|Good night.|See you.|わたしも！ ねこを 2ひき かってるよ。|Me, too. ＝ わたしも
+A: Excuse me, where is the station? / B: ( )|It's over there.|It's ten o'clock.|It's hot.|Yes, it is.|あそこですよ。|over there ＝ あそこに
+A: Let's have lunch in the park. / B: ( )|That's a good idea.|You're welcome.|Nice to meet you.|I'm sorry, I'm late.|それは いいね。|さそわれたら Good idea.
+A: What's that? / B: ( )|It's a new game.|It's me.|He's Tom.|I'm fine.|あたらしい ゲームだよ。|What's that? には It's 〜.
+A: Dinner is ready! / B: ( )|I'm coming.|You're welcome.|Nice to meet you.|See you.|いま いくよ。|I'm coming. ＝ いま いくよ
+A: Whose bike is that? / B: ( )|It's my sister's.|It's red.|It's by the door.|It's new.|いもうとのだよ。|Whose には「だれの」で こたえる
+A: Can you play the guitar? / B: ( ) I practice every day.|Yes, I can.|No, I can't.|Yes, I do.|No, it isn't.|うん、ひけるよ。まいにち れんしゅうしてるよ。|まいにち れんしゅう → ひける`,
+s: `わたしは ねこが すきです。|I like cats.|I cats like.|Like I cats.|Cats like I.
+あなたは どこに すんでいますか。|Where do you live?|Where you do live?|Do you live where?|Where live you do?
+かれは まいにち サッカーを します。|He plays soccer every day.|He every day plays soccer.|He soccer plays every day.|Plays he soccer every day.
+これは だれの ぼうしですか。|Whose cap is this?|Cap whose is this?|Is whose cap this?|This whose cap is?
+いっしょに テニスを しましょう。|Let's play tennis together.|Let's tennis play together.|Play let's tennis together.|Let's together tennis play.
+きょうは なんようびですか。|What day is it today?|What is day it today?|What day it is today?|Day what is it today?
+わたしの かばんは つくえの うえに あります。|My bag is on the desk.|My bag on is the desk.|My bag is the desk on.|On is my bag the desk.
+あなたは ピアノを ひけますか。|Can you play the piano?|Do you can play the piano?|Can play you the piano?|You can the piano play?
+いま なんじですか。|What time is it?|What is it time?|Time what is it?|What time it is?
+まどを あけてください。|Please open the window.|Please the window open.|Open please the window.|The window please open.
+かのじょは なんさいですか。|How old is she?|How is she old?|How old she is?|Old how is she?
+ここで はしっては いけません。|Don't run here.|Run don't here.|Don't here run.|Not run here.
+あなたは なんの スポーツが すきですか。|What sport do you like?|What do you like sport?|What sport you like do?|Sport what do you like?
+わたしは じてんしゃで がっこうへ いきます。|I go to school by bike.|I go by bike school to.|I to school go by bike.|I go school to by bike.
+かれらは こうえんで やきゅうを しています。|They are playing baseball in the park.|They playing are baseball in the park.|They are baseball playing in the park.|They are playing in baseball the park.
+トムは ねこを 2ひき かっています。|Tom has two cats.|Tom two has cats.|Tom has cats two.|Two cats has Tom.
+あなたの たんじょうびは いつですか。|When is your birthday?|When your birthday is?|Is when your birthday?|Your birthday when is?
+わたしは ゆうごはんの あとで テレビを みます。|I watch TV after dinner.|I after dinner TV watch.|I watch after TV dinner.|I TV watch after dinner.
+この りんごは いくらですか。|How much is this apple?|How is this apple much?|How much this apple is?|Much how is this apple?
+あなたは えんぴつを なんぼん もっていますか。|How many pencils do you have?|How many do you have pencils?|How pencils many do you have?|How many pencils you have do?
+としょかんでは しずかに しなさい。|Be quiet in the library.|Quiet be in the library.|Be in quiet the library.|In the library quiet be.
+わたしの あには すうがくが すきでは ありません。|My brother doesn't like math.|My brother don't like math.|My brother doesn't math like.|Doesn't my brother like math.`
+};
+
+/* ぼうけんマップ（1日1エリア × 7日） */
+const AREAS = [
+  { day: 1, name: 'はじまりの草原', sub: 'たんご①', c: '#FFD23F', rounds: [
+    { n: 'どうぶつ', parts: [['v:animal', 10]] },
+    { n: 'いろ・かず', parts: [['v:color', 5], ['v:number', 5]] },
+    { n: 'たべもの', parts: [['v:food', 10]] },
+    { n: 'かぞく・からだ', parts: [['v:family', 6], ['v:body', 4]] },
+    { n: 'きいてみよう', sub: 'リスニング', parts: [['vl:animal,color,number,food,family,body', 10]] },
+  ]},
+  { day: 2, name: 'がっこうの丘', sub: 'たんご②', c: '#9BDDA9', rounds: [
+    { n: 'がっこう', parts: [['v:school', 10]] },
+    { n: 'ようび・つき', parts: [['v:day', 5], ['v:month', 5]] },
+    { n: 'きせつ・てんき', parts: [['v:season', 10]] },
+    { n: 'スポーツ・ばしょ・もの', parts: [['v:sport', 3], ['v:place', 4], ['v:thing', 3]] },
+    { n: 'うごき（どうし）', parts: [['v:verb', 10]] },
+    { n: 'ようす＋リスニング', parts: [['v:adj', 6], ['vl:school,day,month,verb,adj', 4]] },
+  ]},
+  { day: 3, name: 'ぶんぽうの洞くつ', sub: 'am・is・are / do・does / can', c: '#FFB38A', rounds: [
+    { n: 'am・is・are', parts: [['h:g1', 10]] },
+    { n: 'do・does', parts: [['h:g2', 10]] },
+    { n: 'sが つく どうし', parts: [['h:g3', 10]] },
+    { n: '〜している（ing）', parts: [['h:g4', 10]] },
+    { n: 'can・Let\'s・Please', parts: [['h:g5', 10]] },
+    { n: 'he / his / him・on / in / at', parts: [['h:g6', 10]] },
+  ]},
+  { day: 4, name: 'ぎもんしの塔', sub: 'What・Who・Where・How', c: '#C7B6FF', rounds: [
+    { n: 'What・Who・Whose', parts: [['h:w1', 10]] },
+    { n: 'Where・When・How', parts: [['h:w2', 9], ['h:w1', 1]] },
+    { n: 'How many・How much', parts: [['h:w3', 8], ['h:w2', 2]] },
+    { n: 'なんじ・なんようび', parts: [['h:w4', 7], ['h:w1', 3]] },
+    { n: 'ぎもんし ミックス', parts: [['h:w1,w2,w3,w4', 10]] },
+  ]},
+  { day: 5, name: 'かいわの海', sub: 'あいさつ・こたえかた', c: '#8FD3FF', rounds: [
+    { n: 'あいさつ', parts: [['h:c1', 10]] },
+    { n: 'たのむ・わたす', parts: [['h:c2', 8], ['h:c1', 2]] },
+    { n: 'しつもんに こたえる', parts: [['h:c3', 10]] },
+    { n: 'しつもんを えらぶ', parts: [['h:c4', 10]] },
+    { n: 'すこし ながい かいわ', parts: [['h:c5', 10]] },
+    { n: 'かいわ ミックス', parts: [['h:c1,c2,c3,c4,c5', 10]] },
+  ]},
+  { day: 6, name: 'ことばの城', sub: 'ぶんの あなうめ・ならべかえ', c: '#FF9EBB', rounds: [
+    { n: 'ぶんの あなうめ①', parts: [['h:x', 10]] },
+    { n: 'ぶんの あなうめ②', parts: [['h:x', 10]] },
+    { n: 'ならべかえ①', parts: [['h:s', 10]] },
+    { n: 'ならべかえ②', parts: [['h:s', 10]] },
+    { n: 'えいぶん リスニング', parts: [['hl:g1,g3,g4,g5,w1,w2,x', 10]] },
+  ]},
+  { day: 7, name: 'ラスボス城', sub: 'もぎテスト → ラスボス', c: '#FF7A6B', rounds: [
+    { n: 'もぎテスト①', sub: '15もん', parts: [['v:*', 3], ['h:g1,g2,g3,g4,g5,g6,w1,w2,w3,w4,x', 5], ['h:c1,c2,c3,c4,c5', 4], ['h:s', 2], ['vl:*', 1]] },
+    { n: 'もぎテスト②', sub: '15もん', parts: [['v:*', 3], ['h:g1,g2,g3,g4,g5,g6,w1,w2,w3,w4,x', 5], ['h:c1,c2,c3,c4,c5', 4], ['h:s', 2], ['hl:g1,g3,w1,x', 1]] },
+    { n: 'ラスボス', sub: '20もん・16もん せいかいで ごうかく', boss: true, parts: [['v:*', 4], ['h:g1,g2,g3,g4,g5,g6,w1,w2,w3,w4,x', 6], ['h:c1,c2,c3,c4,c5', 5], ['h:s', 3], ['vl:*', 1], ['hl:g1,g3,w1,x', 1]] },
+  ]},
+];
+
+/* =========================================================
+   モンスター
+   ========================================================= */
+const SPECIES = {
+  fire:  { label: 'ほのお', names: ['ほのおの たまご', 'ポッチ', 'ポチボン', 'ボンファイ', 'ファイオン', 'ソルキング'], body: '#FF8A3D', dark: '#D9531E', belly: '#FFE3BF', accent: '#FFD23F' },
+  water: { label: 'みず',   names: ['みずの たまご', 'プルン', 'プルリン', 'アクアル', 'マリネオ', 'ネプチュラ'], body: '#4FB6E8', dark: '#2A7FB8', belly: '#DDF3FF', accent: '#A8E6FF' },
+  leaf:  { label: 'くさ',   names: ['くさの たまご', 'モフ', 'モフリ', 'リーフィ', 'フォレオン', 'ガイアモフ'], body: '#7CCB5B', dark: '#3F9A3A', belly: '#EAF8CF', accent: '#FFB3C7' },
+};
+const EVO = [0, 5, 40, 110, 200, 320];
+const K = '#1F2A44';
+let svgUid = 0;
+
+function stageOf(correct) { let s = 0; EVO.forEach((v, i) => { if (correct >= v) s = i; }); return s; }
+
+function sym(p) { return p + `<g transform="matrix(-1 0 0 1 200 0)">${p}</g>`; }
+
+function monsterSVG(sp, st, mood) {
+  const c = SPECIES[sp]; mood = mood || 'normal';
+  const shadow = (w) => `<ellipse cx="100" cy="190" rx="${w}" ry="6" fill="rgba(31,42,68,.15)"/>`;
+  if (st === 0) {
+    return `<svg viewBox="0 0 200 200" class="msvg" aria-hidden="true">${shadow(44)}<g class="egg">
+      <path d="M100 36 C140 36 158 100 158 132 C158 166 132 188 100 188 C68 188 42 166 42 132 C42 100 60 36 100 36Z" fill="#FFFAF0" stroke="${K}" stroke-width="4"/>
+      <circle cx="80" cy="98" r="12" fill="${c.body}"/><circle cx="124" cy="122" r="16" fill="${c.body}"/><circle cx="86" cy="154" r="10" fill="${c.body}"/><circle cx="118" cy="72" r="7" fill="${c.body}"/>
+      ${mood === 'happy' ? `<path d="M100 40 L94 58 L104 66 L98 80" fill="none" stroke="${K}" stroke-width="3" stroke-linejoin="round"/>` : ''}
+    </g></svg>`;
+  }
+  const id = 'g' + (++svgUid);
+  const sc = [0, .62, .74, .86, .95, 1][st];
+  const leafC = '#5DB84A';
+  let back = '', front = '';
+
+  if (st >= 5) {
+    back += `<circle cx="100" cy="112" r="96" fill="url(#${id})"/>`;
+    [[24, 40], [172, 52], [182, 150], [16, 150], [100, 8]].forEach(([x, y]) => {
+      back += `<path d="M${x} ${y - 10} L${x + 3} ${y - 3} L${x + 10} ${y} L${x + 3} ${y + 3} L${x} ${y + 10} L${x - 3} ${y + 3} L${x - 10} ${y} L${x - 3} ${y - 3}Z" fill="#FFD23F" stroke="${K}" stroke-width="2"/>`;
+    });
+  }
+  if (st >= 4) {
+    const w = {
+      fire: `<path d="M52 112 Q8 60 2 100 Q16 104 12 120 Q28 116 28 132 Q42 124 58 134Z" fill="${c.dark}" stroke="${K}" stroke-width="4" stroke-linejoin="round"/>`,
+      water: `<path d="M50 124 Q-2 116 6 68 Q40 86 62 104Z" fill="${c.accent}" stroke="${K}" stroke-width="4" stroke-linejoin="round"/><path d="M50 118 Q24 100 16 80" fill="none" stroke="${K}" stroke-width="2"/>`,
+      leaf: `<path d="M50 120 Q-2 112 6 60 Q50 68 62 108Z" fill="${leafC}" stroke="${K}" stroke-width="4" stroke-linejoin="round"/><path d="M54 114 Q30 92 12 66" fill="none" stroke="${K}" stroke-width="2"/>`,
+    }[sp];
+    back += sym(w);
+  }
+  if (st >= 3) {
+    back += {
+      fire: `<path d="M150 150 Q192 150 186 110 Q182 92 168 72 Q166 96 156 102 Q170 122 148 132Z" fill="${c.accent}" stroke="${K}" stroke-width="4" stroke-linejoin="round"/>`,
+      water: `<path d="M148 150 Q178 150 182 126 L198 104 Q196 134 200 160 L184 150 Q170 168 146 166Z" fill="${c.body}" stroke="${K}" stroke-width="4" stroke-linejoin="round"/>`,
+      leaf: `<path d="M150 150 Q184 150 182 118" fill="none" stroke="${K}" stroke-width="5" stroke-linecap="round"/><path d="M182 120 Q158 98 174 74 Q198 92 182 120Z" fill="${leafC}" stroke="${K}" stroke-width="4" stroke-linejoin="round"/>`,
+    }[sp];
+  }
+  if (st >= 2) {
+    back += sym({
+      fire: `<path d="M52 98 L44 28 L98 72Z" fill="${c.body}" stroke="${K}" stroke-width="4" stroke-linejoin="round"/><path d="M58 82 L53 46 L82 70Z" fill="${c.accent}"/>`,
+      water: `<path d="M52 104 Q14 72 20 40 Q54 56 72 82Z" fill="${c.accent}" stroke="${K}" stroke-width="4" stroke-linejoin="round"/>`,
+      leaf: `<path d="M66 84 Q24 66 34 22 Q78 34 78 78Z" fill="${leafC}" stroke="${K}" stroke-width="4" stroke-linejoin="round"/><path d="M70 78 Q50 52 38 28" fill="none" stroke="${K}" stroke-width="2"/>`,
+    }[sp]);
+  }
+  let bodyP = `<ellipse cx="100" cy="122" rx="62" ry="58" fill="${c.body}" stroke="${K}" stroke-width="4"/>`;
+  if (st >= 2) {
+    bodyP += `<ellipse cx="100" cy="148" rx="36" ry="24" fill="${c.belly}"/>`;
+    bodyP += `<ellipse cx="72" cy="180" rx="16" ry="9" fill="${c.dark}" stroke="${K}" stroke-width="4"/><ellipse cx="128" cy="180" rx="16" ry="9" fill="${c.dark}" stroke="${K}" stroke-width="4"/>`;
+  }
+  // face
+  let face = '';
+  if (mood === 'happy') {
+    face += `<path d="M70 116 Q80 102 90 116" fill="none" stroke="${K}" stroke-width="5" stroke-linecap="round"/><path d="M110 116 Q120 102 130 116" fill="none" stroke="${K}" stroke-width="5" stroke-linecap="round"/>`;
+    face += `<path d="M88 126 Q100 148 112 126Z" fill="#C2413A" stroke="${K}" stroke-width="3" stroke-linejoin="round"/>`;
+  } else if (mood === 'sad') {
+    face += `<circle cx="80" cy="114" r="6" fill="${K}"/><circle cx="120" cy="114" r="6" fill="${K}"/>`;
+    face += `<path d="M70 100 L88 106 M130 100 L112 106" stroke="${K}" stroke-width="4" stroke-linecap="round"/>`;
+    face += `<path d="M90 136 Q100 128 110 136" fill="none" stroke="${K}" stroke-width="4" stroke-linecap="round"/>`;
+    face += `<path d="M132 118 Q128 128 132 132 Q136 128 132 118Z" fill="#8FD3FF" stroke="${K}" stroke-width="2"/>`;
+  } else {
+    face += `<circle cx="80" cy="112" r="${st === 1 ? 10 : 8}" fill="${K}"/><circle cx="83" cy="108" r="3" fill="#fff"/>`;
+    face += `<circle cx="120" cy="112" r="${st === 1 ? 10 : 8}" fill="${K}"/><circle cx="123" cy="108" r="3" fill="#fff"/>`;
+    face += `<path d="M92 128 Q100 136 108 128" fill="none" stroke="${K}" stroke-width="4" stroke-linecap="round"/>`;
+  }
+  face += `<ellipse cx="66" cy="128" rx="8" ry="5" fill="#FF5C8A" opacity=".45"/><ellipse cx="134" cy="128" rx="8" ry="5" fill="#FF5C8A" opacity=".45"/>`;
+  // head decoration
+  if (st >= 5) {
+    front += `<path d="M74 72 L78 38 L90 56 L100 30 L110 56 L122 38 L126 72Z" fill="#FFD23F" stroke="${K}" stroke-width="4" stroke-linejoin="round"/><circle cx="100" cy="60" r="5" fill="#FF5C8A" stroke="${K}" stroke-width="2"/>`;
+  } else {
+    front += {
+      fire: `<path d="M100 70 Q80 56 92 36 Q96 48 102 50 Q100 34 112 22 Q112 44 120 54 Q122 66 100 70Z" fill="${c.accent}" stroke="${K}" stroke-width="3" stroke-linejoin="round"/>`,
+      water: `<path d="M100 24 Q84 48 86 58 Q88 70 100 70 Q112 70 114 58 Q116 48 100 24Z" fill="${c.accent}" stroke="${K}" stroke-width="3"/>`,
+      leaf: `<path d="M100 66 L100 44" stroke="${K}" stroke-width="4" stroke-linecap="round"/><path d="M100 46 Q82 26 70 38 Q82 52 100 46Z M100 46 Q118 26 130 38 Q118 52 100 46Z" fill="${leafC}" stroke="${K}" stroke-width="3" stroke-linejoin="round"/>`,
+    }[sp];
+  }
+  return `<svg viewBox="0 0 200 200" class="msvg" aria-hidden="true">
+    <defs><radialGradient id="${id}"><stop offset="0" stop-color="#FFF3A6" stop-opacity=".95"/><stop offset=".7" stop-color="#FFE066" stop-opacity=".35"/><stop offset="1" stop-color="#FFE066" stop-opacity="0"/></radialGradient></defs>
+    ${shadow(52 * sc)}
+    <g transform="translate(100 188) scale(${sc}) translate(-100 -188)"><g class="body-g">${back}${bodyP}${face}${front}</g></g>
+  </svg>`;
+}
+
+/* =========================================================
+   セーブデータ
+   ========================================================= */
+const SAVE_KEY = 'eiken5-monster-ranch-v1';
+let S = null;
+function load() { try { const r = localStorage.getItem(SAVE_KEY); return r ? JSON.parse(r) : null; } catch (e) { return null; } }
+function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {} }
+function freshState(sp, nick) { return { sp, nick, correct: 0, answered: 0, stars: {}, wrong: {}, days: {}, seenStage: 0, sound: true, cleared: false }; }
+function todayKey() { const d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
+
+/* =========================================================
+   もんだいを つくる
+   ========================================================= */
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
+const shuffle = (a) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const sample = (a, n) => shuffle(a).slice(0, n);
+
+const WORDS = {};
+Object.entries(VOCAB).forEach(([cat, txt]) => {
+  WORDS[cat] = txt.split(';').map((p) => { const [en, jp] = p.split('='); return { en: en.trim(), jp: jp.trim(), cat }; });
+});
+const ALL_CATS = Object.keys(WORDS);
+const H = {};
+Object.entries(HQ).forEach(([tag, txt]) => {
+  H[tag] = txt.trim().split('\n').map((line, i) => {
+    const p = line.split('|').map((s) => s.trim());
+    return { id: tag + ':' + i, tag, q: p[0], a: p[1], d: [p[2], p[3], p[4]], t: p[5] || '', e: p[6] || '' };
+  });
+});
+
+const fill = (q, a) => q.replace('( )', a);
+const speakText = (s) => s.replace(/(^|\s\/\s)[AB]:\s*/g, ' ').replace(/\s—\s/g, '. ').trim();
+
+function vocabQ(w, mode) {
+  const others = sample(WORDS[w.cat].filter((x) => x.jp !== w.jp && x.en !== w.en), 3);
+  if (mode === 'listen') {
+    return { id: 'vl:' + w.en, kind: 'listen', label: 'きこえた えいごの いみは？', tag: 'リスニング', hidden: w.en, a: w.jp, opts: [w.jp, ...others.map((o) => o.jp)], optEn: false, say: w.en };
+  }
+  if (mode === 'en') {
+    return { id: 've:' + w.en, kind: 'word', label: 'この えいごの いみは？', tag: 'たんご', en: w.en, a: w.jp, opts: [w.jp, ...others.map((o) => o.jp)], optEn: false, say: w.en };
+  }
+  return { id: 'vj:' + w.en, kind: 'wordjp', label: 'えいごで いうと？', tag: 'たんご', jp: w.jp, a: w.en, opts: [w.en, ...others.map((o) => o.en)], optEn: true, say: w.en };
+}
+
+function hQ(it, listen) {
+  const pre = it.tag[0];
+  if (listen) {
+    const pool = ALL_H_BLANK.filter((x) => x.id !== it.id && x.t && x.t !== it.t);
+    return { id: 'hl:' + it.id, kind: 'listen', label: 'きこえた えいぶんの いみは？', tag: 'リスニング', hidden: speakText(fill(it.q, it.a)), a: it.t, opts: [it.t, ...sample(pool, 3).map((x) => x.t)], optEn: false, say: speakText(fill(it.q, it.a)) };
+  }
+  if (pre === 's') {
+    return { id: it.id, kind: 'order', label: 'にほんごに あう えいぶんは？', tag: 'ならべかえ', jp: it.q, a: it.a, opts: [it.a, ...it.d], optEn: true, say: it.a, t: it.q };
+  }
+  if (pre === 'c') {
+    return { id: it.id, kind: 'conv', label: 'かいわの（ ）に はいるのは？', tag: 'かいわ', lines: it.q.split(' / '), a: it.a, opts: [it.a, ...it.d], optEn: true, say: speakText(fill(it.q, it.a)), t: it.t, e: it.e };
+  }
+  return { id: it.id, kind: 'blank', label: '（ ）に はいるのは？', tag: pre === 'w' ? 'ぎもんし' : pre === 'x' ? 'たんご' : 'ぶんぽう', en: it.q, a: it.a, opts: [it.a, ...it.d], optEn: true, say: speakText(fill(it.q, it.a)), t: it.t, e: it.e };
+}
+const ALL_H_BLANK = Object.keys(H).filter((k) => /^[gwx]/.test(k)).flatMap((k) => H[k]);
+
+function buildRound(r) {
+  const out = []; const used = new Set();
+  r.parts.forEach(([src, n]) => {
+    const [kind, list] = src.split(':');
+    const tags = list === '*' ? (kind[0] === 'v' ? ALL_CATS : Object.keys(H)) : list.split(',');
+    if (kind === 'v' || kind === 'vl') {
+      const pool = tags.flatMap((t) => WORDS[t]).filter((w) => !used.has(w.en));
+      sample(pool, n).forEach((w) => { used.add(w.en); out.push(vocabQ(w, kind === 'vl' ? 'listen' : (Math.random() < .5 ? 'en' : 'jp'))); });
+    } else {
+      const pool = tags.flatMap((t) => H[t]).filter((x) => !used.has(x.id));
+      sample(pool, n).forEach((x) => { used.add(x.id); out.push(hQ(x, kind === 'hl')); });
+    }
+  });
+  return r.boss ? shuffle(out) : shuffle(out);
+}
+
+const ROUNDS = [];
+AREAS.forEach((a, ai) => a.rounds.forEach((r, ri) => ROUNDS.push({ ...r, ai, ri, key: a.day + '-' + ri })));
+const roundSize = (r) => r.parts.reduce((s, p) => s + p[1], 0);
+const needOf = (r) => Math.ceil(roundSize(r) * (r.boss ? .8 : .7));
+const isUnlocked = (idx) => idx === 0 || (S.stars[ROUNDS[idx - 1].key] || 0) > 0;
+
+/* =========================================================
+   おと
+   ========================================================= */
+let AC = null, voices = [];
+function loadVoices() { try { voices = speechSynthesis.getVoices(); } catch (e) {} }
+if ('speechSynthesis' in window) { loadVoices(); speechSynthesis.onvoiceschanged = loadVoices; }
+function speak(text, force) {
+  if ((!S || !S.sound) && !force) return;
+  if (!('speechSynthesis' in window)) return;
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'en-US'; u.rate = .85;
+    const v = voices.find((v) => /en[-_]US/i.test(v.lang)) || voices.find((v) => /^en/i.test(v.lang));
+    if (v) u.voice = v;
+    speechSynthesis.speak(u);
+  } catch (e) {}
+}
+function tone(notes, type) {
+  if (!S || !S.sound) return;
+  try {
+    AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+    let t = AC.currentTime;
+    notes.forEach(([f, d]) => {
+      const o = AC.createOscillator(), g = AC.createGain();
+      o.type = type || 'triangle'; o.frequency.value = f;
+      g.gain.setValueAtTime(.18, t); g.gain.exponentialRampToValueAtTime(.001, t + d);
+      o.connect(g); g.connect(AC.destination); o.start(t); o.stop(t + d); t += d * .8;
+    });
+  } catch (e) {}
+}
+const sfx = {
+  ok: () => tone([[784, .12], [1175, .22]]),
+  ng: () => tone([[220, .18], [180, .25]], 'square'),
+  evo: () => tone([[523, .15], [659, .15], [784, .15], [1047, .4]]),
+  clear: () => tone([[659, .12], [784, .12], [988, .3]]),
+};
+const SPK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/><path d="M16.5 8.5a5 5 0 010 7M19 6a8.5 8.5 0 010 12"/></svg>`;
+const MUTE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/><path d="M17 9l5 6M22 9l-5 6"/></svg>`;
+function paintSound() { [$('h-sound'), $('q-sound')].forEach((b) => { b.innerHTML = S.sound ? SPK : MUTE; b.setAttribute('aria-pressed', S.sound ? 'true' : 'false'); }); }
+function toggleSound() { S.sound = !S.sound; if (!S.sound) try { speechSynthesis.cancel(); } catch (e) {} save(); paintSound(); }
+
+/* =========================================================
+   がめん
+   ========================================================= */
+function show(name) {
+  ['start', 'home', 'quiz', 'result'].forEach((s) => { $('scr-' + s).hidden = s !== name; });
+  window.scrollTo(0, 0);
+}
+const monName = () => S.nick ? S.nick : SPECIES[S.sp].names[stageOf(S.correct)];
+
+/* ---- start ---- */
+let pickSp = null;
+function renderStart() {
+  $('eggs').innerHTML = Object.entries(SPECIES).map(([k, v]) =>
+    `<button class="egg-card" data-sp="${k}" aria-pressed="false">${monsterSVG(k, 0)}<span class="t">${v.label}</span></button>`).join('');
+  $('eggs').querySelectorAll('.egg-card').forEach((b) => b.addEventListener('click', () => {
+    pickSp = b.dataset.sp;
+    $('eggs').querySelectorAll('.egg-card').forEach((x) => x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
+    $('start-go').disabled = false;
+  }));
+  show('start');
+}
+$('start-go').addEventListener('click', () => {
+  if (!pickSp) return;
+  S = freshState(pickSp, $('nick').value.trim());
+  save(); renderHome();
+});
+
+/* ---- home ---- */
+const LINES = {
+  0: ['…（たまごが うごいた！）', 'せいかいすると うまれるよ'],
+  1: ['<span class="en">Hello!</span>', '<span class="en">I\'m hungry!</span>', 'もんだい といて〜'],
+  2: ['<span class="en">Let\'s study!</span>', '<span class="en">Nice to meet you!</span>'],
+  3: ['<span class="en">I like English!</span>', '<span class="en">You can do it!</span>'],
+  4: ['<span class="en">I\'m strong!</span>', '<span class="en">Good job!</span>'],
+  5: ['<span class="en">You are great!</span>', 'ごうかく まちがいなし！'],
+};
+function nextInfo(c) {
+  const st = stageOf(c);
+  if (st >= 5) return { txt: 'さいしゅう しんか！', pct: 100 };
+  const lo = EVO[st], hi = EVO[st + 1];
+  return { txt: `しんかまで あと ${hi - c}もん`, pct: Math.round((c - lo) / (hi - lo) * 100) };
+}
+function renderHome() {
+  paintSound();
+  const st = stageOf(S.correct);
+  $('h-name').textContent = monName();
+  $('h-sub').textContent = `${SPECIES[S.sp].label}タイプ・${S.nick ? SPECIES[S.sp].names[st] + '・' : ''}しんか ${st}/5`;
+  $('h-mon').innerHTML = monsterSVG(S.sp, st, 'normal');
+  $('h-mon').className = 'idle';
+  const lines = LINES[st]; $('h-say').innerHTML = lines[Math.floor(Math.random() * lines.length)];
+  $('h-correct').textContent = S.correct;
+  const ni = nextInfo(S.correct); $('h-next').textContent = ni.txt; $('h-meter').style.width = ni.pct + '%';
+  $('h-steps').innerHTML = [1, 2, 3, 4, 5].map((i) => `<span class="${st >= i ? 'on' : ''}"></span>`).join('');
+
+  const sec = S.days[todayKey()] || 0, min = Math.floor(sec / 60);
+  $('h-min').textContent = min;
+  $('h-tmeter').style.width = Math.min(100, sec / 1800 * 100) + '%';
+  const playedDays = Object.keys(S.days).filter((k) => S.days[k] >= 60).length;
+  const nextIdx = ROUNDS.findIndex((r) => !(S.stars[r.key] > 0));
+  const recArea = nextIdx < 0 ? null : AREAS[ROUNDS[nextIdx].ai];
+  $('h-note').textContent = (min >= 30 ? 'きょうの めやす たっせい！ すごい！ ' : '') +
+    (recArea ? `いまは DAY ${recArea.day}「${recArea.name}」だよ。` : 'ぜんクリ！ にがて たいじで しあげよう。') +
+    (playedDays ? `（れんしゅうした日：${playedDays}日）` : '');
+
+  const wc = Object.keys(S.wrong).length;
+  $('h-wcount').textContent = wc; $('h-review').disabled = wc === 0;
+
+  const clearedCount = ROUNDS.filter((r) => S.stars[r.key] > 0).length;
+  $('h-progress').textContent = `${clearedCount} / ${ROUNDS.length} クリア`;
+
+  const openArea = recArea ? recArea.day : AREAS.length;
+  $('map').innerHTML = AREAS.map((a, ai) => {
+    const idxs = ROUNDS.map((r, i) => i).filter((i) => ROUNDS[i].ai === ai);
+    const areaLocked = !isUnlocked(idxs[0]);
+    const got = idxs.reduce((s, i) => s + (S.stars[ROUNDS[i].key] || 0), 0);
+    const rows = idxs.map((i) => {
+      const r = ROUNDS[i], s = S.stars[r.key] || 0, un = isUnlocked(i);
+      const cls = !un ? '' : s > 0 ? 'cleared' : 'next';
+      const stars = [1, 2, 3].map((k) => `<span class="${s >= k ? 'on' : ''}">★</span>`).join('');
+      return `<button class="round ${cls}" data-i="${i}" ${un ? '' : 'disabled'}>
+        <span class="num">${r.ri + 1}</span>
+        <span class="nm">${esc(r.n)}<small>${esc(r.sub || roundSize(r) + 'もん')}・${needOf(r)}もん せいかいで クリア</small></span>
+        <span class="st" aria-label="ほし ${s}こ">${stars}</span></button>`;
+    }).join('');
+    return `<details class="area ${areaLocked ? 'locked' : ''}" style="--area-c:${a.c}" ${a.day === openArea ? 'open' : ''}>
+      <summary><span class="day"><small>DAY</small><b>${a.day}</b></span>
+        <span class="ttl"><h3>${esc(a.name)}</h3><p>${esc(a.sub)}・★ ${got}/${idxs.length * 3}</p></span>
+        <span class="chev" aria-hidden="true">▼</span></summary>
+      <div class="rounds">${rows}</div></details>`;
+  }).join('');
+  $('map').querySelectorAll('.round').forEach((b) => b.addEventListener('click', () => startRound(+b.dataset.i)));
+  show('home');
+}
+$('h-sound').addEventListener('click', toggleSound);
+$('q-sound').addEventListener('click', toggleSound);
+$('h-mon').addEventListener('click', () => {
+  const m = $('h-mon'); const st = stageOf(S.correct);
+  m.innerHTML = monsterSVG(S.sp, st, 'happy'); m.className = 'jump';
+  const lines = LINES[st]; const l = lines[Math.floor(Math.random() * lines.length)];
+  $('h-say').innerHTML = l;
+  const plain = l.replace(/<[^>]+>/g, ''); if (/^[A-Za-z]/.test(plain)) speak(plain);
+  setTimeout(() => { m.innerHTML = monsterSVG(S.sp, st, 'normal'); m.className = 'idle'; }, 700);
+});
+$('h-review').addEventListener('click', () => {
+  const list = Object.values(S.wrong).slice(0, 10).map((q) => ({ ...q }));
+  if (!list.length) return;
+  startQuiz({ n: 'にがて たいじ', review: true }, shuffle(list));
+});
+$('h-zukan').addEventListener('click', () => {
+  const st = stageOf(S.correct);
+  $('zukan').innerHTML = Object.keys(SPECIES).flatMap((sp) => SPECIES[sp].names.map((nm, i) => {
+    const known = sp === S.sp && i <= st;
+    return `<div class="cell ${known ? '' : 'unknown'}">${monsterSVG(sp, i, 'normal')}${known ? esc(nm) : '？？？'}<small>${i === 0 ? 'たまご' : EVO[i] + 'もん'}</small></div>`;
+  })).join('');
+  $('ov-zukan').hidden = false;
+});
+$('zukan-close').addEventListener('click', () => { $('ov-zukan').hidden = true; });
+
+let confirmFn = null;
+function askConfirm(title, body, yes, fn) { $('cf-title').textContent = title; $('cf-body').textContent = body; $('cf-yes').textContent = yes; confirmFn = fn; $('ov-confirm').hidden = false; }
+$('cf-no').addEventListener('click', () => { $('ov-confirm').hidden = true; });
+$('cf-yes').addEventListener('click', () => { $('ov-confirm').hidden = true; if (confirmFn) confirmFn(); });
+$('h-reset').addEventListener('click', () => askConfirm('ほんとうに さいしょから？', 'モンスターも ほしも ぜんぶ きえて、たまごから やりなおしに なるよ。', 'けして やりなおす', () => {
+  try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
+  S = null; pickSp = null; $('nick').value = ''; $('start-go').disabled = true; renderStart();
+}));
+
+/* ---- quiz ---- */
+let Q = null, fbTimer = null;
+function startRound(idx) { const r = ROUNDS[idx]; startQuiz({ ...r, idx }, buildRound(r)); }
+function startQuiz(round, list) {
+  Q = { round, list, i: 0, score: 0, combo: 0, res: [], misses: [], startStage: stageOf(S.correct) };
+  show('quiz'); paintSound(); renderQ();
+}
+function setMini(mood) {
+  const st = stageOf(S.correct);
+  $('q-mon').innerHTML = monsterSVG(S.sp, st, mood) + (Q.combo >= 3 ? `<span class="combo">${Q.combo}コンボ</span>` : '');
+  $('q-mon').className = 'mini ' + (mood === 'happy' ? 'jump' : mood === 'sad' ? 'shake' : 'idle');
+}
+function renderQ() {
+  const q = Q.list[Q.i]; Q.locked = false;
+  q.shown = shuffle(q.opts);
+  $('q-dots').innerHTML = Q.list.map((_, i) => `<i class="${Q.res[i] === true ? 'ok' : Q.res[i] === false ? 'ng' : i === Q.i ? 'now' : ''}"></i>`).join('');
+  $('q-tag').textContent = Q.round.review ? 'にがて' : q.tag;
+  $('q-count').textContent = `${Q.i + 1} / ${Q.list.length}もんめ`;
+  $('q-bubble').textContent = q.label;
+  setMini('normal');
+  let html = '';
+  if (q.kind === 'word') html = `<div class="prompt en word">${esc(q.en)}</div>`;
+  else if (q.kind === 'wordjp') html = `<div class="prompt jp word" style="font-size:32px">${esc(q.jp)}</div>`;
+  else if (q.kind === 'order') html = `<div class="prompt jp">${esc(q.jp)}</div>`;
+  else if (q.kind === 'blank') html = `<div class="prompt en" id="q-text">${blankHTML(q.en)}</div>`;
+  else if (q.kind === 'conv') html = `<div class="prompt en dlg" id="q-text">${q.lines.map((l) => {
+      const m = l.match(/^([AB]):\s*(.*)$/); const who = m ? m[1] : 'A', tx = m ? m[2] : l;
+      return `<div class="ln ${who === 'B' ? 'b' : ''}"><span class="who">${who}</span><span>${blankHTML(tx)}</span></div>`; }).join('')}</div>`;
+  else if (q.kind === 'listen') html = `<div class="listen-box"><button class="play-big" id="q-play" aria-label="もういちど きく">${SPK}</button>
+      <button class="reveal" id="q-reveal">きこえない ときは もじを みる</button><div class="revealed" id="q-revealed" hidden>${esc(q.hidden)}</div></div>`;
+  if (q.kind === 'word' || q.kind === 'blank' || q.kind === 'conv') html += `<div class="say-row"><button class="icon-btn" id="q-say" aria-label="えいごを きく">${SPK}</button></div>`;
+  $('q-prompt').innerHTML = html;
+  if ($('q-say')) $('q-say').addEventListener('click', () => speak(q.kind === 'word' ? q.en : speakText(q.kind === 'conv' ? q.lines.join(' / ').replace('( )', '') : q.en.replace('( )', '')), true));
+  if ($('q-play')) { $('q-play').addEventListener('click', () => speak(q.say, true)); $('q-reveal').addEventListener('click', () => { $('q-revealed').hidden = false; $('q-reveal').hidden = true; }); setTimeout(() => speak(q.say, true), 350); }
+  $('q-opts').innerHTML = q.shown.map((o, k) => `<button class="opt ${q.optEn ? 'en' : ''}" data-k="${k}"><span class="mk">${k + 1}</span><span>${esc(o)}</span></button>`).join('');
+  $('q-opts').querySelectorAll('.opt').forEach((b) => b.addEventListener('click', () => answer(+b.dataset.k)));
+  $('feedback-root').innerHTML = '';
+}
+function blankHTML(s) { return esc(s).replace('( )', '<span class="blank">（　）</span>'); }
+
+function answer(k) {
+  if (Q.locked) return; Q.locked = true;
+  const q = Q.list[Q.i]; const ok = q.shown[k] === q.a;
+  const btns = $('q-opts').querySelectorAll('.opt');
+  btns.forEach((b, j) => { b.disabled = true; if (q.shown[j] === q.a) b.classList.add('correct'); else if (j === k) b.classList.add('wrong'); else b.classList.add('dim'); });
+  const bl = document.querySelector('#q-text .blank'); if (bl) { bl.textContent = q.a; bl.classList.add('filled'); }
+  if ($('q-revealed')) { $('q-revealed').hidden = false; $('q-reveal').hidden = true; }
+  S.answered++;
+  Q.res[Q.i] = ok;
+  const store = { ...q }; delete store.shown;
+  if (ok) {
+    S.correct++; Q.score++; Q.combo++;
+    if (S.wrong[q.id]) delete S.wrong[q.id];
+    sfx.ok(); setMini('happy');
+    const p = document.createElement('span'); p.className = 'plus'; p.textContent = '+1'; $('q-mon').appendChild(p);
+    $('q-bubble').textContent = Q.combo >= 3 ? `${Q.combo}れんぞく せいかい！ すごい！` : ['やったー！', 'せいかい！', 'おいしい！', 'いいね！'][Math.floor(Math.random() * 4)];
+  } else {
+    Q.combo = 0; S.wrong[q.id] = store; Q.misses.push(store);
+    sfx.ng(); setMini('sad');
+    $('q-bubble').textContent = 'ざんねん… こたえを おぼえよう！';
+  }
+  save();
+  $('q-dots').children[Q.i].className = ok ? 'ok' : 'ng';
+  const ansHTML = q.optEn
+    ? `こたえ：<span class="en"><b>${esc(q.a)}</b></span>${q.t ? `<br>${esc(q.t)}` : ''}`
+    : `こたえ：<b>${esc(q.a)}</b>${q.kind !== 'wordjp' ? `<br><span class="en">${esc(q.say)}</span>` : ''}`;
+  const last = Q.i === Q.list.length - 1;
+  $('feedback-root').innerHTML = `<div class="feedback ${ok ? 'ok' : 'ng'}" role="status"><div class="inner">
+    <div class="res"><span class="mark">${ok ? '◯' : '×'}</span>${ok ? 'せいかい！' : 'ざんねん！'}</div>
+    <div class="ans">${ansHTML}</div>
+    ${q.e && !ok ? `<div class="ex">ポイント：${esc(q.e)}</div>` : ''}
+    <div class="acts"><button class="icon-btn" id="fb-say" aria-label="もういちど きく">${SPK}</button><button class="btn ${ok ? 'green' : ''}" id="fb-next">${last ? 'けっかを みる' : 'つぎへ'}</button></div>
+  </div></div>`;
+  $('fb-say').addEventListener('click', () => speak(q.say, true));
+  $('fb-next').addEventListener('click', next);
+  $('fb-next').focus({ preventScroll: true });
+  setTimeout(() => speak(q.say), ok ? 250 : 400);
+  clearTimeout(fbTimer);
+  if (ok) fbTimer = setTimeout(next, 1700);
+}
+function next() {
+  clearTimeout(fbTimer);
+  if (!Q || !Q.locked) return;
+  if (Q.i < Q.list.length - 1) { Q.i++; renderQ(); window.scrollTo(0, 0); }
+  else finish();
+}
+$('q-quit').addEventListener('click', () => askConfirm('とちゅうで やめる？', 'ここまでの せいかいは モンスターの ごはんに なっているよ。ほしは もらえないよ。', 'マップに もどる', () => { clearTimeout(fbTimer); $('feedback-root').innerHTML = ''; Q = null; renderHome(); }));
+
+/* ---- result ---- */
+function finish() {
+  $('feedback-root').innerHTML = '';
+  const r = Q.round, n = Q.list.length, sc = Q.score;
+  let starsGot = 0, clear = false, firstBoss = false;
+  if (!r.review) {
+    const need = needOf(r);
+    clear = sc >= need;
+    if (clear) starsGot = sc === n ? 3 : sc / n >= .9 ? 2 : 1;
+    const prev = S.stars[r.key] || 0;
+    if (starsGot > prev) S.stars[r.key] = starsGot;
+    if (r.boss && clear && !S.cleared) { S.cleared = true; firstBoss = true; }
+  }
+  save();
+  const st = stageOf(S.correct);
+  $('r-title').textContent = r.review ? 'にがて たいじ おわり！' : clear ? (r.boss ? 'ラスボス げきは！' : 'ステージ クリア！') : 'おしい！ もういちど！';
+  $('r-score').textContent = sc; $('r-total').textContent = ' / ' + n;
+  $('r-stars').innerHTML = r.review ? '' : [1, 2, 3].map((k) => `<span class="${starsGot >= k ? 'on' : ''}">★</span>`).join('');
+  $('r-msg').textContent = r.review ? `にがてが ${Object.keys(S.wrong).length}こ のこっているよ。` :
+    clear ? (sc === n ? 'ぜんもん せいかい！ パーフェクト！' : 'つぎの ステージが ひらいたよ！') : `${needOf(r)}もん せいかいで クリアだよ。まちがえた もんだいを みなおそう！`;
+  $('r-mon').innerHTML = monsterSVG(S.sp, st, sc / n >= .7 ? 'happy' : 'normal'); $('r-mon').className = 'mon idle';
+  $('r-correct').textContent = S.correct;
+  const ni = nextInfo(S.correct); $('r-next').textContent = ni.txt; setTimeout(() => { $('r-meter').style.width = ni.pct + '%'; }, 50); $('r-meter').style.width = '0';
+
+  const acts = [];
+  if (!r.review) {
+    const nextIdx = r.idx + 1;
+    if (clear && nextIdx < ROUNDS.length) acts.push(`<button class="btn pink" data-a="next">つぎの ステージへ</button>`);
+    acts.push(`<button class="btn ${clear ? 'white' : 'pink'}" data-a="retry">もういちど ちょうせん</button>`);
+  } else if (Object.keys(S.wrong).length) acts.push(`<button class="btn pink" data-a="review">にがて たいじを つづける</button>`);
+  acts.push(`<button class="btn white" data-a="home">マップに もどる</button>`);
+  $('r-acts').innerHTML = acts.join('');
+  $('r-acts').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
+    const a = b.dataset.a;
+    if (a === 'next') startRound(r.idx + 1);
+    else if (a === 'retry') startRound(r.idx);
+    else if (a === 'review') $('h-review').click();
+    else renderHome();
+  }));
+  $('r-miss').innerHTML = Q.misses.length ? `<h3>まちがえた もんだい（にがてリストに はいったよ）</h3><ul>${Q.misses.map((m) =>
+    `<li>${m.kind === 'order' || m.kind === 'wordjp' ? esc(m.jp) + ' → ' : m.kind === 'word' ? esc(m.en) + ' → ' : ''}<span class="${m.optEn ? 'en' : ''}">${esc(m.a)}</span><small>${esc(m.kind === 'listen' ? m.say : m.kind === 'word' ? '' : m.t || '')}</small></li>`).join('')}</ul>` : '';
+  show('result');
+  if (clear || r.review) sfx.clear();
+
+  const after = () => { if (firstBoss) showEnding(); };
+  if (st > S.seenStage) showEvolution(S.seenStage, st, after); else after();
+}
+
+/* ---- evolution ---- */
+function showEvolution(from, to, done) {
+  const names = SPECIES[S.sp].names;
+  $('evo-stage').innerHTML = `<div class="old">${monsterSVG(S.sp, from, 'normal')}</div><div class="new">${monsterSVG(S.sp, to, 'happy')}</div><div class="evo-flash"></div>`;
+  $('evo-text').innerHTML = from === 0 ? 'おや？ たまごの ようすが…！？' : `おや？ ${esc(S.nick || names[from])}の ようすが…！？`;
+  $('evo-ok').hidden = true; $('ov-evo').hidden = false;
+  setTimeout(() => {
+    sfx.evo();
+    $('evo-text').innerHTML = from === 0
+      ? `たまごが かえって <b>${esc(names[to])}</b> が うまれた！`
+      : `おめでとう！ ${esc(S.nick || names[from])}は <b>${esc(names[to])}</b> に しんかした！`;
+    $('evo-ok').hidden = false; $('evo-ok').focus();
+  }, 2400);
+  $('evo-ok').onclick = () => { S.seenStage = to; save(); $('ov-evo').hidden = true; $('r-mon').innerHTML = monsterSVG(S.sp, to, 'happy'); done && done(); };
+}
+function showEnding() {
+  const st = stageOf(S.correct);
+  $('end-mon').innerHTML = monsterSVG(S.sp, st, 'happy'); $('end-mon').className = 'mon idle';
+  const rate = S.answered ? Math.round(S.correct / S.answered * 100) : 0;
+  $('end-text').innerHTML = `${esc(monName())}と いっしょに 7日間 がんばったね！<br>せいかい ${S.correct}もん・せいかいりつ ${rate}％<br>ほんばんも この ちょうしで！ ごうかく まちがいなし！`;
+  $('ov-end').hidden = false; sfx.evo();
+}
+$('end-ok').addEventListener('click', () => { $('ov-end').hidden = true; renderHome(); });
+
+/* ---- きょうの れんしゅう じかん ---- */
+setInterval(() => {
+  if (!S || document.hidden || $('scr-quiz').hidden) return;
+  const k = todayKey(); S.days[k] = (S.days[k] || 0) + 1;
+  if (S.days[k] % 10 === 0) save();
+}, 1000);
+
+/* ---- boot ---- */
+S = load();
+if (S && SPECIES[S.sp]) renderHome(); else renderStart();
+</script>
+</body>
+</html>
