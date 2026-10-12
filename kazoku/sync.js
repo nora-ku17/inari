@@ -26,10 +26,10 @@ const Sync = (() => {
       set: a => {
         const c = a[0];
         if (!c) return;
-        if (Array.isArray(c.expenseCats) && c.expenseCats.length) state.budget.expenseCats = c.expenseCats;
-        if (Array.isArray(c.incomeCats) && c.incomeCats.length) state.budget.incomeCats = c.incomeCats;
-        state.budget.limits = c.limits || {};
-        if (typeof c.taxRate === 'number') state.stocks.taxRate = c.taxRate;
+        state.budget.expenseCats = normCats(c.expenseCats, state.budget.expenseCats);
+        state.budget.incomeCats = normCats(c.incomeCats, state.budget.incomeCats);
+        state.budget.limits = normLimits(c.limits);
+        if (typeof c.taxRate === 'number' && c.taxRate >= 0 && c.taxRate <= 100) state.stocks.taxRate = c.taxRate;
       },
     },
   };
@@ -53,7 +53,8 @@ const Sync = (() => {
   }
   const clean = r => JSON.parse(JSON.stringify(r));
   const randomId = () => [...crypto.getRandomValues(new Uint8Array(15))].map(b => 'abcdefghijkmnpqrstuvwxyz23456789'[b % 32]).join('');
-  const isConnected = () => !!(conf.config && conf.fid && user);
+  const verified = () => !!(user && user.emailVerified);
+  const isConnected = () => !!(conf.config && conf.fid && verified());
 
   /* ---------- 招待リンク ---------- */
   function encodeInvite() {
@@ -97,6 +98,7 @@ const Sync = (() => {
     if (initError) return { cls: 'err', icon: '⚠', text: '同期エラー' };
     if (!authReady) return { cls: 'busy', icon: '⟳', text: '接続中' };
     if (!user) return { cls: 'off', icon: '☁', text: 'ログインしてください' };
+    if (!verified()) return { cls: 'off', icon: '✉', text: 'メール確認待ち' };
     if (!conf.fid) return { cls: 'off', icon: '☁', text: '家族未設定' };
     if (lastError) return { cls: 'err', icon: '⚠', text: '同期エラー' };
     if (!navigator.onLine) return { cls: 'off', icon: '⚠', text: 'オフライン' };
@@ -145,7 +147,7 @@ const Sync = (() => {
       fb.onAuthStateChanged(auth, u => {
         user = u;
         authReady = true;
-        if (u && conf.fid) listen(); else stopListen();
+        if (u && u.emailVerified && conf.fid) listen(); else stopListen();
         updateBadge();
         if (currentTab === 'settings') scheduleRender();
       });
@@ -173,11 +175,12 @@ const Sync = (() => {
     // 同じ順番のときはidで並べ、どの端末でも同じ並びになるようにする
     return arr.sort((a, b) => (o(a.id) - o(b.id)) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   }
-  function docRecord(d) {
+  /** 受け取ったデータは必ず検査してから使う（不正なデータは無視） */
+  function docRecord(name, d) {
     const rec = d.data();
     delete rec._o;
     rec.id = d.id;
-    return rec;
+    return name === 'config' ? (d.id === 'shared' ? rec : null) : normRecord(name, rec);
   }
 
   function listen() {
@@ -197,7 +200,7 @@ const Sync = (() => {
           if (snap.metadata.fromCache && snap.empty) return;
           firstDone.add(name);
           synced[name] = new Map(snap.docs.map(d => [d.id, stable(d.data())]));
-          const recs = snap.docs.map(docRecord);
+          const recs = snap.docs.map(d => docRecord(name, d)).filter(Boolean);
           COLS[name].set(COLS[name].ordered ? sortOrdered(name, recs) : recs);
           if (firstDone.size === Object.keys(COLS).length) onReady();
           return;
@@ -229,8 +232,9 @@ const Sync = (() => {
       }
       const j = stable(ch.doc.data());
       if (s.get(id) === j) continue; // 自分が送った変更
+      const rec = docRecord(name, ch.doc);
+      if (!rec) continue;
       s.set(id, j);
-      const rec = docRecord(ch.doc);
       const i = arr.findIndex(r => r.id === id);
       if (i >= 0) arr[i] = rec; else arr.push(rec);
       changed = true;
@@ -364,7 +368,7 @@ const Sync = (() => {
         <form id="sync-login-form" class="sync-form" autocomplete="on">
           <div class="row">
             <label class="field"><span class="lbl">メールアドレス</span><input type="email" name="email" autocomplete="username" required></label>
-            <label class="field"><span class="lbl">パスワード（6文字以上）</span><input type="password" name="password" autocomplete="current-password" minlength="6" required></label>
+            <label class="field"><span class="lbl">パスワード（10文字以上・ほかで使っていないもの）</span><input type="password" name="password" autocomplete="current-password" minlength="10" required></label>
           </div>
           <div class="btn-row">
             <button class="btn primary" name="mode" value="login">ログイン</button>
@@ -373,6 +377,14 @@ const Sync = (() => {
           </div>
         </form>
         <p class="hint"><button class="link-btn" data-action="sync-forget">同期の設定を削除</button></p>`;
+    } else if (!verified()) {
+      body = `<p>ログイン中：<b>${esc(user.email)}</b></p>
+        <div class="sync-note">✉ <b>${esc(user.email)}</b> に確認メールを送りました。メールの中のリンクを開いてから、下の「確認しました」を押してください。<br><small>本人のメールアドレスであることを確認するためです（届かないときは迷惑メールフォルダも見てください）。</small></div>
+        <div class="btn-row">
+          <button class="btn primary" data-action="sync-verified">確認しました</button>
+          <button class="btn" data-action="sync-resend">確認メールを再送</button>
+          <button class="btn" data-action="sync-logout">ログアウト</button>
+        </div>`;
     } else if (!conf.fid) {
       body = `<p>ログイン中：<b>${esc(user.email)}</b></p>
         ${conf.invite ? `<div class="sync-note">📩 家族から招待されています。<div class="btn-row" style="margin-top:8px"><button class="btn primary" data-action="sync-join-invite">家族に参加する</button></div></div>` : ''}
@@ -431,7 +443,22 @@ const Sync = (() => {
       localStorage.removeItem(CONF_KEY);
       location.reload();
     },
-    'sync-logout': async () => { await fb.signOut(auth); toast('ログアウトしました'); },
+    'sync-logout': async () => {
+      const how = await choose('ログアウトします。\nスマホをなくしたときや、ほかの人と共用している端末では「データも消す」を選んでください（家族の共有データは消えません）。', [
+        { label: 'キャンセル', value: null }, { label: 'ログアウトのみ', value: 'keep' }, { label: 'データも消す', value: 'wipe', cls: 'danger' }]);
+      if (!how) return;
+      stopListen();
+      await fb.signOut(auth).catch(() => null);
+      if (how === 'wipe') {
+        delete conf.fid;
+        saveConf();
+        localStorage.removeItem(STORE_KEY);
+        try { indexedDB.databases && (await indexedDB.databases()).forEach(d => d.name && d.name.startsWith('firestore/') && indexedDB.deleteDatabase(d.name)); } catch (e) { /* noop */ }
+        location.reload();
+        return;
+      }
+      toast('ログアウトしました');
+    },
     'sync-leave': async () => {
       if (!(await confirmYes('このスマホの同期をやめます。\n家族の共有データは消えません。このスマホのデータもそのまま残ります。', '同期をやめる'))) return;
       stopListen();
@@ -440,6 +467,19 @@ const Sync = (() => {
       render();
     },
     'sync-join-invite': () => joinFamily(conf.invite),
+    'sync-resend': async () => {
+      try { await fb.sendEmailVerification(user); toast('確認メールを送りました'); }
+      catch (e) { toast(AUTH_ERRORS[e.code] || '送信できませんでした（' + (e.code || e) + '）'); }
+    },
+    'sync-verified': async () => {
+      try { await user.reload(); await user.getIdToken(true); } catch (e) { toast('確認できませんでした（' + (e.code || e) + '）'); return; }
+      user = auth.currentUser;
+      if (!verified()) { toast('まだ確認されていません。メールのリンクを開いてください'); return; }
+      toast('メールアドレスを確認しました');
+      if (conf.fid) listen();
+      updateBadge();
+      render();
+    },
     'sync-share': async () => {
       const url = encodeInvite();
       const text = 'かぞく手帳で予定を共有しよう！このリンクを開いて、招待されたメールアドレスでアカウントを作ってね。';
@@ -465,7 +505,7 @@ const Sync = (() => {
     'auth/wrong-password': 'パスワードが違います',
     'auth/user-not-found': 'このメールアドレスのアカウントがありません。「はじめて」から作ってください',
     'auth/email-already-in-use': 'このメールアドレスはすでに登録されています。「ログイン」してください',
-    'auth/weak-password': 'パスワードは6文字以上にしてください',
+    'auth/weak-password': 'パスワードは10文字以上にしてください',
     'auth/invalid-email': 'メールアドレスの形式が正しくありません',
     'auth/operation-not-allowed': 'Firebaseで「メール / パスワード」ログインが有効になっていません',
     'auth/network-request-failed': 'ネットワークにつながっていません',
@@ -485,9 +525,12 @@ const Sync = (() => {
       case 'sync-login-form': {
         const email = fd.get('email').trim(), pw = fd.get('password');
         const mode = submitter && submitter.value === 'signup' ? 'signup' : 'login';
+        if (mode === 'signup' && pw.length < 10) { toast('パスワードは10文字以上にしてください'); return true; }
         try {
-          if (mode === 'signup') await fb.createUserWithEmailAndPassword(auth, email, pw);
-          else await fb.signInWithEmailAndPassword(auth, email, pw);
+          if (mode === 'signup') {
+            const cred = await fb.createUserWithEmailAndPassword(auth, email, pw);
+            await fb.sendEmailVerification(cred.user).catch(() => null);
+          } else await fb.signInWithEmailAndPassword(auth, email, pw);
           toast('ログインしました');
         } catch (e) { toast(AUTH_ERRORS[e.code] || `ログインできませんでした（${e.code || e}）`); }
         return true;

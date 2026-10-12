@@ -131,6 +131,59 @@ function defaultState() {
   };
 }
 
+/* ---------- データの検査（読み込み・バックアップ・同期で受け取ったデータを安全な形にそろえる） ---------- */
+const sStr = (v, max = 200) => (typeof v === 'string' || typeof v === 'number' ? String(v) : '').slice(0, max);
+const sId = v => /^[A-Za-z0-9_-]{1,64}$/.test(sStr(v, 100)) ? String(v) : '';
+const sDate = v => /^\d{4}-\d{2}-\d{2}$/.test(sStr(v, 20)) ? String(v) : '';
+const sTime = v => /^\d{2}:\d{2}$/.test(sStr(v, 10)) ? String(v) : '';
+const sColor = v => /^#[0-9a-fA-F]{6}$/.test(sStr(v, 10)) ? String(v) : '#888888';
+const sNum = v => { const n = Number(v); return isFinite(n) ? n : 0; };
+const sArr = v => Array.isArray(v) ? v : [];
+const sPick = (v, list, def) => list.includes(v) ? v : def;
+const SCHEMA = {
+  members: r => ({ id: sId(r.id), name: sStr(r.name, 20) || '？', role: sPick(r.role, Object.keys(ROLES), 'other'), color: sColor(r.color) }),
+  events: r => {
+    const e = {
+      id: sId(r.id), title: sStr(r.title, 80), date: sDate(r.date), endDate: sDate(r.endDate), allDay: !!r.allDay,
+      start: sTime(r.start), end: sTime(r.end), members: sArr(r.members).map(sId).filter(Boolean),
+      repeat: sPick(r.repeat, Object.keys(REPEATS), 'none'), until: sDate(r.until),
+      exdates: sArr(r.exdates).map(sDate).filter(Boolean), memo: sStr(r.memo, 1000),
+    };
+    if (!e.allDay && !e.start) e.allDay = true;
+    return e.date ? e : null;
+  },
+  bucket: r => ({ id: sId(r.id), title: sStr(r.title, 80), cat: sStr(r.cat, 30), by: sId(r.by), done: !!r.done, doneDate: sDate(r.doneDate), memo: sStr(r.memo, 1000) }),
+  tx: r => {
+    const t = { id: sId(r.id), date: sDate(r.date), type: sPick(r.type, ['income', 'expense'], 'expense'), cat: sStr(r.cat, 30), amount: Math.round(sNum(r.amount)), who: sId(r.who), memo: sStr(r.memo, 200), created: sNum(r.created) };
+    return t.date ? t : null;
+  },
+  holdings: r => ({
+    id: sId(r.id), code: sStr(r.code, 10), name: sStr(r.name, 60), account: sPick(r.account, ['特定', '一般', 'NISA'], '特定'), owner: sId(r.owner),
+    shares: sNum(r.shares), cost: sNum(r.cost), price: sNum(r.price), dps: sNum(r.dps),
+    months: [...new Set(sArr(r.months).map(Number).filter(m => Number.isInteger(m) && m >= 1 && m <= 12))].sort((a, b) => a - b),
+    yutai: sStr(r.yutai, 100), memo: sStr(r.memo, 200),
+  }),
+  receipts: r => {
+    const x = { id: sId(r.id), date: sDate(r.date), holdingId: sId(r.holdingId), amount: Math.round(sNum(r.amount)), memo: sStr(r.memo, 200) };
+    if (sId(r.txId)) x.txId = r.txId;
+    if (r.name) x.name = sStr(r.name, 80);
+    return x.date ? x : null;
+  },
+};
+/** 1件のデータを検査して安全な形にする（不正なものは null） */
+function normRecord(kind, r) {
+  if (!r || typeof r !== 'object') return null;
+  const out = SCHEMA[kind](r);
+  return out && out.id ? out : null;
+}
+const normList = (kind, list) => sArr(list).map(r => normRecord(kind, r)).filter(Boolean);
+function normCats(list, def) { const a = [...new Set(sArr(list).map(c => sStr(c, 30).trim()).filter(Boolean))]; return a.length ? a : [...def]; }
+function normLimits(o) {
+  const out = {};
+  if (o && typeof o === 'object') for (const [k, v] of Object.entries(o)) if (sNum(v) > 0) out[sStr(k, 30)] = Math.round(sNum(v));
+  return out;
+}
+
 /* ---------- 保存・読み込み ---------- */
 function mergeState(def, s) {
   if (!s || typeof s !== 'object') return def;
@@ -145,6 +198,25 @@ function mergeState(def, s) {
   for (const k of ['tx', 'expenseCats', 'incomeCats']) if (!Array.isArray(out.budget[k])) out.budget[k] = def.budget[k];
   for (const k of ['holdings', 'receipts']) if (!Array.isArray(out.stocks[k])) out.stocks[k] = [];
   if (!Array.isArray(out.settings.hidden)) out.settings.hidden = [];
+  // 中身の検査
+  out.members = normList('members', out.members);
+  if (!out.members.some(m => m.id === FAMILY_ID)) out.members.unshift(def.members[0]);
+  out.events = normList('events', out.events);
+  out.bucket = normList('bucket', out.bucket);
+  out.budget = { tx: normList('tx', out.budget.tx), expenseCats: normCats(out.budget.expenseCats, DEFAULT_EXPENSE), incomeCats: normCats(out.budget.incomeCats, DEFAULT_INCOME), limits: normLimits(out.budget.limits) };
+  out.stocks = { holdings: normList('holdings', out.stocks.holdings), receipts: normList('receipts', out.stocks.receipts), taxRate: Math.min(100, Math.max(0, sNum(out.stocks.taxRate))) };
+  const st = out.settings, pr = st.print;
+  st.hidden = st.hidden.map(sId).filter(Boolean);
+  st.weekStart = st.weekStart === 1 ? 1 : 0;
+  st.calView = sPick(st.calView, ['month', 'week', 'agenda'], 'month');
+  st.tab = sStr(st.tab, 20);
+  pr.layout = sPick(pr.layout, ['table', 'calendar'], 'table');
+  pr.orient = sPick(pr.orient, ['portrait', 'landscape'], 'portrait');
+  pr.font = sPick(pr.font, ['s', 'm', 'l'], 'm');
+  pr.time = sPick(pr.time, ['start', 'range', 'none'], 'start');
+  pr.month = /^\d{4}-\d{2}$/.test(sStr(pr.month, 10)) ? pr.month : '';
+  pr.memo = !!pr.memo;
+  pr.members = Array.isArray(pr.members) ? pr.members.map(sId).filter(Boolean) : null;
   return out;
 }
 function load() {
