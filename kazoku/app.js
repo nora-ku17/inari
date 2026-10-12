@@ -121,6 +121,7 @@ function defaultState() {
       { id: 'm_child1', name: '子ども1', role: 'child', color: '#33B679' },
     ],
     events: [],
+    notes: [],
     bucket: [],
     budget: { tx: [], expenseCats: [...DEFAULT_EXPENSE], incomeCats: [...DEFAULT_INCOME], limits: {} },
     stocks: { holdings: [], receipts: [], taxRate: 20.315 },
@@ -141,6 +142,7 @@ const sNum = v => { const n = Number(v); return isFinite(n) ? n : 0; };
 const sArr = v => Array.isArray(v) ? v : [];
 const sPick = (v, list, def) => list.includes(v) ? v : def;
 const SCHEMA = {
+  notes: r => { const n = { id: sId(r.id), date: sDate(r.date), text: sStr(r.text, 200) }; return n.date && n.text ? n : null; },
   members: r => ({ id: sId(r.id), name: sStr(r.name, 20) || '？', role: sPick(r.role, Object.keys(ROLES), 'other'), color: sColor(r.color) }),
   events: r => {
     const e = {
@@ -194,7 +196,7 @@ function mergeState(def, s) {
   out.settings.print = { ...def.settings.print, ...((s.settings || {}).print || {}) };
   if (!Array.isArray(out.members) || !out.members.length) out.members = def.members;
   if (!out.members.some(m => m.id === FAMILY_ID)) out.members.unshift(def.members[0]);
-  for (const k of ['events', 'bucket']) if (!Array.isArray(out[k])) out[k] = [];
+  for (const k of ['events', 'bucket', 'notes']) if (!Array.isArray(out[k])) out[k] = [];
   for (const k of ['tx', 'expenseCats', 'incomeCats']) if (!Array.isArray(out.budget[k])) out.budget[k] = def.budget[k];
   for (const k of ['holdings', 'receipts']) if (!Array.isArray(out.stocks[k])) out.stocks[k] = [];
   if (!Array.isArray(out.settings.hidden)) out.settings.hidden = [];
@@ -202,6 +204,7 @@ function mergeState(def, s) {
   out.members = normList('members', out.members);
   if (!out.members.some(m => m.id === FAMILY_ID)) out.members.unshift(def.members[0]);
   out.events = normList('events', out.events);
+  out.notes = normList('notes', out.notes);
   out.bucket = normList('bucket', out.bucket);
   out.budget = { tx: normList('tx', out.budget.tx), expenseCats: normCats(out.budget.expenseCats, DEFAULT_EXPENSE), incomeCats: normCats(out.budget.incomeCats, DEFAULT_INCOME), limits: normLimits(out.budget.limits) };
   out.stocks = { holdings: normList('holdings', out.stocks.holdings), receipts: normList('receipts', out.stocks.receipts), taxRate: Math.min(100, Math.max(0, sNum(out.stocks.taxRate))) };
@@ -451,6 +454,7 @@ function monthHtml() {
     const cls = ['mc', d.getMonth() !== m ? 'other' : '', ds === today ? 'today' : '', (dw === 0 || hol) ? 'sun' : dw === 6 ? 'sat' : ''].join(' ');
     cells += `<div class="${cls}" data-action="cell-click" data-date="${ds}">
       <div class="mc-head"><button class="dnum" data-action="open-day" data-date="${ds}" aria-label="${fmtDateJa(ds)}">${d.getDate() === 1 ? `${d.getMonth() + 1}/` : ''}${d.getDate()}</button>${hol ? `<span class="hol">${esc(hol)}</span>` : ''}</div>
+      ${noteOn(ds) ? `<div class="mc-note">${esc(noteOn(ds))}</div>` : ''}
       <div class="mc-evs">${occ.slice(0, max).map(chipHtml).join('')}${occ.length > max ? `<button class="more" data-action="open-day" data-date="${ds}">他 ${occ.length - max} 件</button>` : ''}</div>
     </div>`;
   }
@@ -633,6 +637,7 @@ function openDayDialog(ds) {
   const hol = holidayName(ds);
   openDialog(`<div class="dlg-form">
     ${dlgHead(fmtDateJa(ds) + (hol ? ' ' + hol : ''))}
+    ${noteOn(ds) ? `<p class="day-note">📝 ${esc(noteOn(ds))}</p>` : ''}
     <div class="day-list">${occ.length ? occ.map(o => `<button class="ag-item ${evVisible(o.ev) ? '' : 'dim'}" data-action="edit-event" data-id="${o.ev.id}" data-occ="${o.occ}">
       <span class="dots">${dotsHtml(evColors(o.ev))}</span><span class="ag-time">${timeLabel(o.ev)}</span>
       <span class="ag-title">${esc(o.ev.title)}</span><span class="ag-who">${evMembers(o.ev).map(m => esc(m.name)).join('・')}</span></button>`).join('')
@@ -640,6 +645,133 @@ function openDayDialog(ds) {
     <div class="dlg-actions"><span class="spacer"></span><button class="btn primary" data-action="new-event" data-date="${ds}">＋ この日に予定を追加</button></div>
   </div>`, { type: 'day', date: ds });
 }
+
+/* =========================================================
+   まとめて入力（表計算のように1か月分を入力）
+   - 行＝日付、列＝備考・家族・一人ずつ
+   - セルの文字はその人のその日の予定になる（カレンダーにも反映）
+   - 「13時〜」「10:00-11:30」のような時刻は自動で読み取る
+   - 複数あるときは「／」で区切る
+   ========================================================= */
+const entry = { cursor: new Date() };
+const NOTE_PREFIX = 'n';
+const noteId = ds => NOTE_PREFIX + ds;
+const noteOn = ds => { const n = state.notes.find(x => x.date === ds); return n ? n.text : ''; };
+
+/** そのセルが「持っている」予定（その日だけ・くりかえしなし・その人だけの予定） */
+function ownedEvents(ds, mid) {
+  return state.events.filter(ev => ev.date === ds && (!ev.endDate || ev.endDate === ev.date)
+    && (!ev.repeat || ev.repeat === 'none')
+    && ((ev.members || []).length ? ev.members.length === 1 && ev.members[0] === mid : mid === FAMILY_ID))
+    .sort((a, b) => cmpOcc({ ev: a }, { ev: b }));
+}
+/** セルには入らないが、その人に関係する予定（くりかえし・複数人・連日）→ チップで表示 */
+function sharedOccs(ds, mid) {
+  const own = new Set(ownedEvents(ds, mid));
+  return occurrencesOn(ds, { all: true }).filter(o => !own.has(o.ev) && evMembers(o.ev).some(m => m.id === mid));
+}
+function entryLabel(ev) {
+  if (ev.allDay || !ev.start) return ev.title;
+  return `${ev.title} ${ev.start}〜${ev.end || ''}`;
+}
+const cellText = (ds, mid) => ownedEvents(ds, mid).map(entryLabel).join(' ／ ');
+
+/** 「ピアノ発表会(13時〜)」→ { title:'ピアノ発表会', start:'13:00', end:'' } */
+function parseEntry(raw) {
+  const text = raw.replace(/[０-９：]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+  const T = '(\\d{1,2})(?::(\\d{2})|時(?:(半)|(\\d{1,2})分?)?)';
+  const re = new RegExp(`[（(]?\\s*${T}\\s*(?:(?:[〜~\\-－–ー]|から)\\s*(?:${T})?(?:まで)?)?\\s*[）)]?`);
+  const m = text.match(re);
+  const hm = (h, mm, half, mm2) => {
+    const H = +h, M = mm != null ? +mm : half ? 30 : mm2 != null ? +mm2 : 0;
+    return H <= 24 && M < 60 ? `${pad(Math.min(H, 23))}:${pad(H === 24 ? 59 : M)}` : '';
+  };
+  if (!m) return { title: raw.trim(), start: '', end: '' };
+  const start = hm(m[1], m[2], m[3], m[4]);
+  const end = m[5] != null ? hm(m[5], m[6], m[7], m[8]) : '';
+  if (!start) return { title: raw.trim(), start: '', end: '' };
+  const title = (text.slice(0, m.index) + text.slice(m.index + m[0].length)).replace(/\s+/g, ' ').trim();
+  return { title: title || raw.trim(), start, end: end > start ? end : '' };
+}
+
+function commitCell(ds, mid, value) {
+  const owned = ownedEvents(ds, mid);
+  const items = value.split(/[\n／]/).map(s => s.trim()).filter(Boolean).map(parseEntry);
+  items.forEach((it, i) => {
+    const data = { title: it.title.slice(0, 80), allDay: !it.start, start: it.start, end: it.end };
+    if (owned[i]) Object.assign(owned[i], data);
+    else state.events.push({ id: uid(), date: ds, endDate: '', members: [mid], repeat: 'none', until: '', exdates: [], memo: '', ...data });
+  });
+  const drop = new Set(owned.slice(items.length));
+  if (drop.size) state.events = state.events.filter(ev => !drop.has(ev));
+  save();
+}
+function commitNote(ds, value) {
+  const text = value.trim().slice(0, 200);
+  const n = state.notes.find(x => x.date === ds);
+  if (!text) state.notes = state.notes.filter(x => x !== n);
+  else if (n) n.text = text;
+  else state.notes.push({ id: noteId(ds), date: ds, text });
+  save();
+}
+
+renderers.entry = function () {
+  const y = entry.cursor.getFullYear(), m = entry.cursor.getMonth(), today = todayStr();
+  const ms = state.members;
+  let rows = '';
+  for (let d = 1; d <= daysIn(y, m); d++) {
+    const date = new Date(y, m, d), ds = ymd(date), dw = date.getDay(), hol = holidayName(ds);
+    const cls = [(dw === 0 || hol) ? 'sun' : dw === 6 ? 'sat' : '', ds === today ? 'today' : ''].join(' ');
+    rows += `<tr class="${cls}">
+      <th class="g-date" scope="row">${m + 1}/${d}</th>
+      <td class="g-dow">${DOW[dw]}</td>
+      <td class="g-note"><input class="gi" data-note="${ds}" value="${esc(noteOn(ds))}" placeholder="${esc(hol)}" aria-label="${fmtDateJa(ds)} 備考"></td>
+      ${ms.map(mem => {
+        const chips = sharedOccs(ds, mem.id).map(o => `<button class="gchip" data-action="edit-event" data-id="${o.ev.id}" data-occ="${o.occ}" style="--c:${evColors(o.ev)[0]}" title="${esc(timeLabel(o.ev) + ' ' + o.ev.title)}">${o.ev.repeat && o.ev.repeat !== 'none' ? '↻ ' : ''}${isAllDayLike(o.ev) ? '' : o.ev.start + ' '}${esc(o.ev.title)}</button>`).join('');
+        return `<td class="g-cell">${chips ? `<div class="gchips">${chips}</div>` : ''}<input class="gi" data-date="${ds}" data-mid="${mem.id}" value="${esc(cellText(ds, mem.id))}" aria-label="${fmtDateJa(ds)} ${esc(mem.name)}"></td>`;
+      }).join('')}
+    </tr>`;
+  }
+  $('#tab-entry').innerHTML = `
+  <div class="page-toolbar">
+    <div class="arrows"><button class="icon-btn" data-action="entry-move" data-dir="-1" aria-label="前の月">‹</button><button class="icon-btn" data-action="entry-move" data-dir="1" aria-label="次の月">›</button></div>
+    <h2>${y}年${m + 1}月をまとめて入力</h2>
+    <button class="btn" data-action="entry-today">今月</button>
+    <span class="spacer"></span>
+    <button class="btn" data-action="entry-print">🖨️ この月を印刷</button>
+  </div>
+  <p class="hint entry-hint">セルに直接書くと、その人の予定になります（カレンダーにも反映）。<b>Enter</b>で下へ、<b>Tab</b>で右へ。時間は「13時〜」「10:00-11:30」のように書くと時刻として登録。1つのセルに複数入れるときは「／」で区切ります。<span class="gchip demo" style="--c:#888">↻ くりかえし</span>や複数人の予定はタップして編集。</p>
+  <div class="grid-wrap">
+    <table class="grid">
+      <colgroup><col class="c-date"><col class="c-dow"><col class="c-note">${ms.map(() => '<col class="c-mem">').join('')}</colgroup>
+      <thead><tr><th class="g-date">日付</th><th class="g-dow">曜日</th><th class="g-note">備考</th>
+        ${ms.map(mem => `<th class="g-mem" style="--c:${mem.color}">${esc(mem.name)}</th>`).join('')}</tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+};
+
+/** セルの入力を保存して、表示を整える */
+function onGridChange(t) {
+  if (t.dataset.note) { commitNote(t.dataset.note, t.value); return; }
+  commitCell(t.dataset.date, t.dataset.mid, t.value);
+  t.value = cellText(t.dataset.date, t.dataset.mid);
+}
+/** Enter・↑↓ で上下のセルへ移動 */
+document.addEventListener('keydown', e => {
+  const t = e.target;
+  if (!t.classList || !t.classList.contains('gi') || e.isComposing || e.keyCode === 229) return;
+  let dir = 0;
+  if (e.key === 'Enter' || e.key === 'ArrowDown') dir = e.shiftKey && e.key === 'Enter' ? -1 : 1;
+  else if (e.key === 'ArrowUp') dir = -1;
+  if (!dir) return;
+  e.preventDefault();
+  const td = t.closest('td'), tr = td.parentElement;
+  const col = [...tr.children].indexOf(td);
+  const next = dir > 0 ? tr.nextElementSibling : tr.previousElementSibling;
+  const target = next && next.children[col] && next.children[col].querySelector('input.gi');
+  if (target) { target.focus(); target.select(); } else t.blur();
+});
 
 /* =========================================================
    印刷（A4 ひと月）
@@ -721,6 +853,8 @@ function tableSheet(y, m) {
   const titleH = 9, headH = 7;
   const rowH = (H - titleH - headH - 3) / n;
   const memoCol = o.memo ? `<col style="width:${o.orient === 'portrait' ? 28 : 45}mm">` : '';
+  const prefix = `${y}-${pad(m + 1)}-`;
+  const hasNotes = state.notes.some(x => x.date.startsWith(prefix));
   let rows = '';
   for (let d = 1; d <= n; d++) {
     const date = new Date(y, m, d), ds = ymd(date), dw = date.getDay(), hol = holidayName(ds);
@@ -732,13 +866,14 @@ function tableSheet(y, m) {
     }).join('');
     rows += `<tr class="${cls}" style="height:${rowH.toFixed(2)}mm">
       <td class="pd"><div class="pc" style="max-height:${(rowH - 0.6).toFixed(2)}mm"><b>${d}</b><span class="pdw">${DOW[dw]}</span>${hol ? `<div class="phol">${esc(hol)}</div>` : ''}</div></td>
+      ${hasNotes ? `<td class="pnote"><div class="pc" style="max-height:${(rowH - 0.6).toFixed(2)}mm">${esc(noteOn(ds))}</div></td>` : ''}
       ${cells}${o.memo ? '<td></td>' : ''}</tr>`;
   }
   return `<div class="sheet font-${o.font}">
     <div class="sheet-title" style="height:${titleH}mm"><h1>${y}年${m + 1}月</h1><span class="sub">かぞくの予定</span>${sheetLegend(ms)}</div>
     <table class="ptable">
-      <colgroup><col style="width:13mm">${ms.map(() => '<col>').join('')}${memoCol}</colgroup>
-      <thead><tr style="height:${headH}mm"><th>日</th>${ms.map(mem => `<th style="background:${mem.color};color:${textOn(mem.color)}">${esc(mem.name)}</th>`).join('')}${o.memo ? '<th class="memo-h">メモ</th>' : ''}</tr></thead>
+      <colgroup><col style="width:13mm">${hasNotes ? '<col style="width:22mm">' : ''}${ms.map(() => '<col>').join('')}${memoCol}</colgroup>
+      <thead><tr style="height:${headH}mm"><th>日</th>${hasNotes ? '<th class="memo-h">備考</th>' : ''}${ms.map(mem => `<th style="background:${mem.color};color:${textOn(mem.color)}">${esc(mem.name)}</th>`).join('')}${o.memo ? '<th class="memo-h">メモ</th>' : ''}</tr></thead>
       <tbody>${rows}</tbody>
     </table></div>`;
 }
@@ -1218,6 +1353,7 @@ function addSampleData() {
   ev({ title: '歯医者', date: d(20), start: '15:30', end: '16:00', members: [c, w] });
   ev({ title: '家族でキャンプ', date: d(24), endDate: d(25), allDay: true, members: [FAMILY_ID] });
   ev({ title: '給料日', date: d(25), allDay: true, members: [h], repeat: 'monthly' });
+  if (!state.notes.some(n => n.date === d(14))) state.notes.push({ id: 'n' + d(14), date: d(14), text: 'お弁当' });
   const tx = (date, type, cat, amount, memo, who = '') => state.budget.tx.push({ id: uid(), date, type, cat, amount, memo, who, created: Date.now() });
   tx(d(1), 'expense', '住居', 85000, '家賃'); tx(d(3), 'expense', '食費', 6280, 'スーパー'); tx(d(5), 'expense', '習い事', 7700, 'スイミング月謝', c);
   tx(d(7), 'expense', '水道光熱', 11200, '電気代'); tx(d(9), 'expense', '食費', 4510, 'スーパー'); tx(d(10), 'expense', '日用品', 2380, 'ドラッグストア');
@@ -1266,6 +1402,11 @@ const actions = {
   'open-day': t => openDayDialog(t.dataset.date),
   'edit-event': t => { const ev = state.events.find(x => x.id === t.dataset.id); if (ev) openEventDialog({ ev, occ: t.dataset.occ }); },
   'delete-event': () => deleteEvent(),
+
+  // まとめて入力
+  'entry-move': t => { entry.cursor = addMonths(entry.cursor, +t.dataset.dir); render(); },
+  'entry-today': () => { entry.cursor = new Date(); render(); },
+  'entry-print': () => { printOpts().month = ym(entry.cursor); save(); switchTab('print'); },
 
   // 印刷
   'pr-set': t => {
@@ -1408,6 +1549,7 @@ $('#dlg').addEventListener('close', () => { dlgCtx = null; });
 
 document.addEventListener('change', e => {
   const t = e.target;
+  if (t.classList && t.classList.contains('gi')) { onGridChange(t); return; }
   // 予定フォーム
   if (t.form && t.form.id === 'event-form') {
     if (t.name === 'allDay') t.form.querySelector('.time-row').hidden = t.checked;

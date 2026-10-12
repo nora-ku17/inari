@@ -7,7 +7,7 @@
    - 変更はリアルタイムに相手の端末へ反映されます。
    - オフライン中の変更は端末に保存され、つながったときに送信されます。
    データ構造: families/{familyId} … emails（参加できるメールアドレス）
-              families/{familyId}/{members|events|bucket|tx|holdings|receipts|config}/{id}
+              families/{familyId}/{members|events|notes|bucket|tx|holdings|receipts|config}/{id}
    ========================================================= */
 const Sync = (() => {
   const CONF_KEY = 'kazoku-sync-v1';
@@ -17,6 +17,7 @@ const Sync = (() => {
   const COLS = {
     members: { get: () => state.members, set: a => { state.members = a; }, ordered: true },
     events: { get: () => state.events, set: a => { state.events = a; } },
+    notes: { get: () => state.notes, set: a => { state.notes = a; } },
     bucket: { get: () => state.bucket, set: a => { state.bucket = a; }, ordered: true },
     tx: { get: () => state.budget.tx, set: a => { state.budget.tx = a; } },
     holdings: { get: () => state.stocks.holdings, set: a => { state.stocks.holdings = a; } },

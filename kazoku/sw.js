@@ -1,6 +1,6 @@
 // かぞく手帳 Service Worker：アプリ本体をキャッシュしてオフラインでも開けるようにする
 // ファイルを更新したら VERSION を上げてください
-const VERSION = 'kazoku-v3';
+const VERSION = 'kazoku-v4';
 const ASSETS = [
   './', './index.html', './style.css', './app.js', './sync.js', './manifest.webmanifest',
   './vendor/firebase-10.14.1.js',

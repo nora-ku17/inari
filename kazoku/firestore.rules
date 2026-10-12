@@ -29,7 +29,7 @@ service cloud.firestore {
       allow delete: if false;
 
       match /{col}/{docId} {
-        allow read, write: if col in ['members', 'events', 'bucket', 'tx', 'holdings', 'receipts', 'config']
+        allow read, write: if col in ['members', 'events', 'notes', 'bucket', 'tx', 'holdings', 'receipts', 'config']
           && isFamilyMember(fid);
       }
     }
