@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<meta name="description" content="家族の予定・家計簿・配当をまとめて管理するアプリ">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="かぞく手帳">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>かぞく手帳</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="style.css">
+<style id="page-style">@page { size: A4 portrait; margin: 8mm; }</style>
+</head>
+<body>
+<header class="app-header">
+  <div class="brand"><span class="logo" aria-hidden="true">🦊</span><span>かぞく手帳</span>
+    <button id="sync-badge" class="sync-badge" data-action="go-settings" hidden></button></div>
+  <nav class="tabs" aria-label="メニュー">
+    <button data-tab="calendar"><span aria-hidden="true">📅</span>カレンダー</button>
+    <button data-tab="print"><span aria-hidden="true">🖨️</span>印刷</button>
+    <button data-tab="bucket"><span aria-hidden="true">🌈</span>やりたい100</button>
+    <button data-tab="budget"><span aria-hidden="true">💰</span>家計簿</button>
+    <button data-tab="stocks"><span aria-hidden="true">📈</span>株・配当</button>
+    <button data-tab="settings"><span aria-hidden="true">👪</span>家族・設定</button>
+  </nav>
+</header>
+
+<main>
+  <section id="tab-calendar" class="tab" hidden></section>
+  <section id="tab-print" class="tab" hidden></section>
+  <section id="tab-bucket" class="tab" hidden></section>
+  <section id="tab-budget" class="tab" hidden></section>
+  <section id="tab-stocks" class="tab" hidden></section>
+  <section id="tab-settings" class="tab" hidden></section>
+</main>
+
+<dialog id="dlg"></dialog>
+<dialog id="confirm"></dialog>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script src="app.js"></script>
+<script src="sync.js"></script>
+</body>
+</html>
