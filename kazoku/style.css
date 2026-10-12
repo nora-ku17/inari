@@ -517,3 +517,40 @@ li.done .b-title { color: var(--sub); text-decoration: line-through; text-decora
   .paper.portrait { width: 194mm !important; height: 280mm !important; }
   .paper.landscape { width: 281mm !important; height: 193mm !important; }
 }
+
+/* =========================================================
+   家族で同期・アプリ
+   ========================================================= */
+.sync-badge {
+  display: inline-flex; align-items: center; gap: 4px; border: 0; border-radius: 999px;
+  padding: 2px 10px; font-size: 12px; font-weight: 600; background: #f1f3f4; color: var(--sub); white-space: nowrap;
+}
+.sync-badge.ok { background: #e6f4ea; color: #137333; }
+.sync-badge.busy { background: var(--primary-soft); color: var(--primary); }
+.sync-badge.err { background: #fce8e6; color: #b3261e; }
+.brand .sync-badge { margin-left: 6px; }
+.sync-card { border: 2px solid var(--primary-soft); }
+.sync-card p { margin: 0 0 10px; }
+.sync-form { margin-top: 12px; }
+.sync-form textarea { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; }
+.sync-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
+.sync-box { border: 1px solid var(--line-soft); border-radius: 12px; padding: 12px; margin-bottom: 12px; }
+.sync-choice .sync-box { margin: 0; }
+.sync-box h4 { margin: 0 0 6px; font-size: 15px; }
+.sync-note { background: #fff8e1; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; }
+.sync-err { background: #fce8e6; color: #b3261e; border-radius: 10px; padding: 10px 12px; }
+.email-list { margin: 4px 0 10px; padding-left: 20px; }
+.inline-form { display: flex; gap: 8px; }
+.inline-form input { flex: 1; }
+.mini-steps { margin: 4px 0 10px; padding-left: 20px; font-size: 14px; }
+.setup-steps { background: #f8f9fa; border-radius: 10px; padding: 10px 12px; }
+.setup-steps summary { cursor: pointer; font-weight: 700; color: var(--primary); }
+.setup-steps ol { padding-left: 20px; margin: 8px 0; font-size: 14px; }
+.setup-steps li { margin-bottom: 6px; }
+code { background: #f1f3f4; border-radius: 4px; padding: 1px 5px; font-size: 13px; word-break: break-all; }
+@media (max-width: 700px) {
+  .sync-choice { grid-template-columns: 1fr; }
+  .inline-form { flex-direction: column; }
+  .brand { display: flex; }
+}
+@media print { .sync-badge { display: none !important; } }

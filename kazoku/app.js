@@ -157,6 +157,7 @@ let state = load();
 function save() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
   catch (e) { toast('保存できませんでした（ブラウザの保存容量をご確認ください）'); }
+  if (window.Sync) Sync.schedulePush();
 }
 
 /* ---------- 共通UI ---------- */
@@ -521,6 +522,7 @@ function saveEventForm(form) {
   if (!data.members.length) data.members = [FAMILY_ID];
   if (dlgCtx.id) {
     const ev = state.events.find(e => e.id === dlgCtx.id);
+    if (goneRecord(ev)) return;
     Object.assign(ev, data);
   } else {
     state.events.push({ id: uid(), exdates: [], ...data });
@@ -1070,6 +1072,8 @@ function openReceiptDialog(id) {
    ========================================================= */
 renderers.settings = function () {
   $('#tab-settings').innerHTML = `
+  ${window.Sync ? Sync.panel() : ''}
+  ${installCardHtml()}
   <div class="card">
     <h3>家族メンバーと色</h3>
     <p class="hint">「家族みんな」は家族全体の予定用です（削除できません）。色はカレンダーや印刷に使われます。</p>
@@ -1097,7 +1101,9 @@ renderers.settings = function () {
   </div>
   <div class="card">
     <h3>データ</h3>
-    <p class="hint">データはこの端末のブラウザの中だけに保存されます。機種変更や別の端末で使うときは「バックアップを書き出す」→「読み込む」で移せます。ブラウザの履歴・サイトデータを消すとデータも消えるので、ときどきバックアップしてください。</p>
+    <p class="hint">${window.Sync && Sync.isConnected()
+      ? '家族で同期中です。データはクラウドと各スマホに保存されています。念のため、ときどきバックアップを書き出しておくと安心です。'
+      : 'データはこの端末のブラウザの中に保存されます（上の「家族で同期」を設定すると、夫婦のスマホで自動的に共有されます）。ブラウザの履歴・サイトデータを消すとデータも消えるので、ときどきバックアップしてください。'}</p>
     <div class="btn-row">
       <button class="btn primary" data-action="data-export">バックアップを書き出す</button>
       <label class="btn">バックアップを読み込む<input type="file" accept="application/json,.json" data-action-change="data-import" hidden></label>
@@ -1106,6 +1112,22 @@ renderers.settings = function () {
     </div>
   </div>`;
 };
+
+/* ---------- アプリとしてインストール（PWA） ---------- */
+let installPrompt = null;
+const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installPrompt = e; if (currentTab === 'settings') render(); });
+window.addEventListener('appinstalled', () => { installPrompt = null; toast('ホーム画面に追加しました'); if (currentTab === 'settings') render(); });
+
+function installCardHtml() {
+  if (isStandalone()) return '';
+  let body;
+  if (installPrompt) body = '<button class="btn primary" data-action="app-install">📲 ホーム画面に追加する</button>';
+  else if (isIOS()) body = '<ol class="mini-steps"><li>Safariでこのページを開く</li><li>画面下の共有ボタン（□に↑）をタップ</li><li>「ホーム画面に追加」→「追加」</li></ol>';
+  else body = '<p class="hint">ブラウザのメニュー（︙）から「アプリをインストール」または「ホーム画面に追加」を選んでください。</p>';
+  return `<div class="card"><h3>📲 アプリとして使う</h3><p class="hint">ホーム画面に追加すると、アイコンから全画面のアプリとして開けます。オフラインでも見られます。</p>${body}</div>`;
+}
 
 function addSampleData() {
   const t = new Date(), y = t.getFullYear(), m = t.getMonth();
@@ -1147,6 +1169,7 @@ function addSampleData() {
    ========================================================= */
 const actions = {
   'close-dialog': () => closeDialog(),
+  'go-settings': () => { switchTab('settings'); window.scrollTo(0, 0); },
 
   // カレンダー
   'cal-today': () => { cal.cursor = new Date(); render(); },
@@ -1185,6 +1208,7 @@ const actions = {
   'bucket-filter': t => { bucketView.filter = t.dataset.v; render(); },
   'bucket-toggle': t => {
     const b = state.bucket.find(x => x.id === t.dataset.id);
+    if (!b) return;
     b.done = !b.done;
     b.doneDate = b.done ? (b.doneDate || todayStr()) : '';
     save(); render();
@@ -1194,7 +1218,7 @@ const actions = {
   'bucket-ideas': () => openBucketIdeas(),
   'bucket-delete': async () => {
     const b = state.bucket.find(x => x.id === dlgCtx.id);
-    if (!(await confirmYes(`「${b.title}」を削除しますか？`))) return;
+    if (goneRecord(b) || !(await confirmYes(`「${b.title}」を削除しますか？`))) return;
     state.bucket = state.bucket.filter(x => x !== b);
     save(); closeDialog(); render();
   },
@@ -1233,7 +1257,7 @@ const actions = {
   'holding-edit': t => openHoldingDialog(t.dataset.id),
   'holding-delete': async () => {
     const h = state.stocks.holdings.find(x => x.id === dlgCtx.id);
-    if (!(await confirmYes(`「${h.name}」を削除しますか？\n（受け取った配当の記録は残ります）`))) return;
+    if (goneRecord(h) || !(await confirmYes(`「${h.name}」を削除しますか？\n（受け取った配当の記録は残ります）`))) return;
     state.stocks.receipts.forEach(r => { if (r.holdingId === h.id) r.name = `${h.code} ${h.name}`; });
     state.stocks.holdings = state.stocks.holdings.filter(x => x !== h);
     save(); closeDialog(); render();
@@ -1242,14 +1266,14 @@ const actions = {
   'receipt-edit': t => openReceiptDialog(t.dataset.id),
   'receipt-delete': async () => {
     const r = state.stocks.receipts.find(x => x.id === dlgCtx.id);
-    if (!(await confirmYes(r.txId ? 'この配当の記録を削除しますか？\n（家計簿の収入からも削除されます）' : 'この配当の記録を削除しますか？'))) return;
+    if (goneRecord(r) || !(await confirmYes(r.txId ? 'この配当の記録を削除しますか？\n（家計簿の収入からも削除されます）' : 'この配当の記録を削除しますか？'))) return;
     state.stocks.receipts = state.stocks.receipts.filter(x => x !== r);
     if (r.txId) state.budget.tx = state.budget.tx.filter(x => x.id !== r.txId);
     save(); closeDialog(); render();
   },
 
   // 設定
-  'member-color': t => { const m = memberById(t.dataset.id); m.color = t.dataset.c; save(); render(); },
+  'member-color': t => { const m = memberById(t.dataset.id); if (!m) return; m.color = t.dataset.c; save(); render(); },
   'member-move': t => {
     const i = state.members.findIndex(m => m.id === t.dataset.id), j = i + +t.dataset.dir;
     if (j < 0 || j >= state.members.length) return;
@@ -1278,14 +1302,22 @@ const actions = {
     const po = printOpts(); if (po.members) po.members = po.members.filter(x => x !== m.id);
     save(); render();
   },
+  'app-install': async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    await installPrompt.userChoice.catch(() => null);
+    installPrompt = null;
+    render();
+  },
   'data-export': () => { downloadFile(`かぞく手帳_バックアップ_${todayStr()}.json`, JSON.stringify(state, null, 2), 'application/json'); toast('バックアップを書き出しました'); },
   'data-sample': async () => {
     if (!(await choose('今月のお試し予定・家計簿・株のデータを追加します。よろしいですか？', [{ label: 'キャンセル', value: false }, { label: '追加する', value: true, cls: 'primary' }]))) return;
     addSampleData(); toast('お試しデータを追加しました'); switchTab('calendar');
   },
   'data-reset': async () => {
-    if (!(await confirmYes('すべてのデータ（予定・家計簿・株・やりたいこと・家族設定）を削除します。元に戻せません。', 'すべて削除'))) return;
-    state = defaultState(); save(); render(); toast('削除しました');
+    const shared = window.Sync && Sync.isConnected() ? '\n※ 家族で同期中のため、家族全員のスマホからも削除されます。' : '';
+    if (!(await confirmYes('すべてのデータ（予定・家計簿・株・やりたいこと・家族設定）を削除します。元に戻せません。' + shared, 'すべて削除'))) return;
+    state = { ...defaultState(), settings: state.settings }; save(); render(); toast('削除しました');
   },
 };
 
@@ -1330,6 +1362,7 @@ document.addEventListener('change', e => {
   if (t.matches('[data-bucket-cat]')) { bucketView.cat = t.value; render(); return; }
   if (t.dataset.mfield) {
     const m = memberById(t.dataset.id);
+    if (!m) return;
     const v = t.value.trim();
     if (t.dataset.mfield === 'name') { if (!v) { t.value = m.name; return; } m.name = v; }
     else m[t.dataset.mfield] = v;
@@ -1346,8 +1379,8 @@ document.addEventListener('change', e => {
       try {
         const data = JSON.parse(reader.result);
         if (!data || !Array.isArray(data.members)) throw new Error('format');
-        if (!(await choose('バックアップを読み込むと、今のデータは置き換わります。よろしいですか？', [{ label: 'キャンセル', value: false }, { label: '読み込む', value: true, cls: 'primary' }]))) return;
-        state = mergeState(defaultState(), data);
+        if (!(await choose('バックアップを読み込むと、今のデータは置き換わります。' + (window.Sync && Sync.isConnected() ? '\n※ 家族で同期中のため、家族全員のデータが置き換わります。' : '') + 'よろしいですか？', [{ label: 'キャンセル', value: false }, { label: '読み込む', value: true, cls: 'primary' }]))) return;
+        state = mergeState(defaultState(), { ...data, settings: state.settings });
         save(); render(); toast('読み込みました');
       } catch (err) { toast('読み込めませんでした（かぞく手帳のバックアップファイルを選んでください）'); }
       finally { t.value = ''; }
@@ -1355,6 +1388,14 @@ document.addEventListener('change', e => {
     reader.readAsText(file);
   }
 });
+
+/** 相手のスマホで削除された記録を編集しようとしたとき */
+function goneRecord(rec) {
+  if (rec) return false;
+  closeDialog(); render();
+  toast('この記録はほかの家族によって削除されました');
+  return true;
+}
 
 document.addEventListener('submit', e => {
   const f = e.target;
@@ -1372,6 +1413,7 @@ document.addEventListener('submit', e => {
     }
     case 'bucket-edit-form': {
       const b = state.bucket.find(x => x.id === dlgCtx.id);
+      if (goneRecord(b)) return;
       const done = !!fd.get('done');
       Object.assign(b, { title: fd.get('title').trim() || b.title, cat: fd.get('cat'), by: fd.get('by') || '', done, doneDate: done ? (fd.get('doneDate') || todayStr()) : '', memo: fd.get('memo').trim() });
       save(); closeDialog(); render();
@@ -1397,6 +1439,7 @@ document.addEventListener('submit', e => {
     }
     case 'tx-edit-form': {
       const t = state.budget.tx.find(x => x.id === dlgCtx.id);
+      if (goneRecord(t)) return;
       const amount = Math.round(num(fd.get('amount')));
       if (amount <= 0) { toast('金額を入力してください'); return; }
       Object.assign(t, { date: fd.get('date'), amount, cat: fd.get('cat'), who: fd.get('who') || '', memo: fd.get('memo').trim() });
@@ -1420,7 +1463,11 @@ document.addEventListener('submit', e => {
         months: fd.getAll('months').map(Number), yutai: fd.get('yutai').trim(), memo: fd.get('memo').trim(),
       };
       if (data.shares <= 0) { toast('保有数を入力してください'); return; }
-      if (dlgCtx.id) Object.assign(state.stocks.holdings.find(x => x.id === dlgCtx.id), data);
+      if (dlgCtx.id) {
+        const h = state.stocks.holdings.find(x => x.id === dlgCtx.id);
+        if (goneRecord(h)) return;
+        Object.assign(h, data);
+      }
       else state.stocks.holdings.push({ id: uid(), ...data });
       save(); closeDialog(); render(); toast('保存しました');
       break;
@@ -1431,7 +1478,7 @@ document.addEventListener('submit', e => {
       const h = state.stocks.holdings.find(x => x.id === fd.get('holdingId'));
       const data = { date: fd.get('date'), holdingId: fd.get('holdingId'), amount, memo: fd.get('memo').trim() };
       let r;
-      if (dlgCtx.id) { r = state.stocks.receipts.find(x => x.id === dlgCtx.id); Object.assign(r, data); }
+      if (dlgCtx.id) { r = state.stocks.receipts.find(x => x.id === dlgCtx.id); if (goneRecord(r)) return; Object.assign(r, data); }
       else { r = { id: uid(), ...data }; state.stocks.receipts.push(r); }
       const memo = h ? `${h.code} ${h.name} 配当` : '配当';
       if (!dlgCtx.id && fd.get('toBudget')) {
@@ -1453,6 +1500,8 @@ document.addEventListener('submit', e => {
       state.stocks.taxRate = v; save(); closeDialog(); render();
       break;
     }
+    default:
+      if (window.Sync) Sync.onSubmit(f, fd, e.submitter);
   }
 });
 
@@ -1469,3 +1518,7 @@ let lastDay = todayStr();
 setInterval(() => { if (todayStr() !== lastDay) { lastDay = todayStr(); if (currentTab === 'calendar') render(); } }, 60000);
 
 switchTab(currentTab);
+
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW', err)));
+}
