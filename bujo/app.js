@@ -325,3 +325,8 @@ document.addEventListener('submit', ev => {
 });
 
 render();
+
+// オフライン対応(PWA)。file:// など非対応環境では何もしない
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
