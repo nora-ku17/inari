@@ -11,9 +11,9 @@ let state = { tab: 'daily', date: today(), month: today().slice(0, 7) };
 function load() {
   try {
     const d = JSON.parse(localStorage.getItem(KEY));
-    if (d && d.entries) return d;
+    if (d && d.entries) return { wishes: [], shop: [], places: [], trades: [], collections: [], habits: [], ...d };
   } catch (e) { /* 保存データなし/破損 */ }
-  return { entries: [], collections: [], habits: [] };
+  return { entries: [], collections: [], habits: [], wishes: [], shop: [], places: [], trades: [] };
 }
 function save() {
   try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { /* 保存不可環境 */ }
@@ -143,6 +143,70 @@ function viewHabits() {
     <div class="habit-grid">${db.habits.length ? `<table><tr><th></th>${head}</tr>${rows}</table>` : '<p class="hint">習慣を追加すると、日ごとにチェックできます。</p>'}</div>`;
 }
 
+
+// ---- やりたいこと100 / 買いたいもの / 行きたい場所 / 個別株売買 ----
+const yen = n => '¥' + Math.round(n).toLocaleString('ja-JP');
+const delBtn = (list, id) => `<button data-act="rm" data-list="${list}" data-id="${id}">削除</button>`;
+
+function viewWishes() {
+  const done = db.wishes.filter(w => w.done).length, total = 100;
+  return `<h2>2026年やりたいこと100</h2>
+    <p><b>${done}</b> / ${total} 達成 <progress value="${done}" max="${total}" style="width:100%"></progress></p>
+    ${db.wishes.length < total ? `<form class="add" data-form="wish"><input name="t" placeholder="やりたいこと (あと${total - db.wishes.length}個)" required><button class="btn primary">追加</button></form>` : '<p class="hint">100個そろいました!</p>'}
+    <ul class="log">${db.wishes.length ? db.wishes.map((w, i) => `<li class="${w.done ? 'st-done' : ''}"><span class="hint" style="width:26px;margin:0;flex:none;text-align:right">${i + 1}</span><button class="sym" data-act="wishdone" data-id="${w.id}">${w.done ? '×' : '•'}</button><span class="txt">${esc(w.text)}</span><span class="acts">${delBtn('wishes', w.id)}</span></li>`).join('') : '<li class="empty">まだありません</li>'}</ul>`;
+}
+
+function viewShop() {
+  const rank = { 高: 0, 中: 1, 低: 2 };
+  const items = [...db.shop].sort((a, b) => a.bought - b.bought || rank[a.pri] - rank[b.pri]);
+  const total = db.shop.filter(s => !s.bought).reduce((s, x) => s + x.price, 0);
+  return `<h2>買いたいもの</h2><p>未購入の合計: <b>${yen(total)}</b></p>
+    <form class="add" data-form="shop"><input name="t" placeholder="品名" required><input name="p" type="number" min="0" inputmode="numeric" placeholder="金額" style="max-width:90px"><select name="r"><option>高</option><option selected>中</option><option>低</option></select><button class="btn primary">追加</button></form>
+    <ul class="log">${items.length ? items.map(s => `<li class="${s.bought ? 'st-done' : ''}"><button class="sym" data-act="shopdone" data-id="${s.id}">${s.bought ? '×' : '•'}</button><span class="txt">${esc(s.name)} <span class="hint">優先:${s.pri}</span></span><span class="txt" style="flex:none;text-align:right">${yen(s.price)}</span><span class="acts">${delBtn('shop', s.id)}</span></li>`).join('') : '<li class="empty">まだありません</li>'}</ul>`;
+}
+
+function viewPlaces() {
+  const f = state.placeFilter || 'all';
+  const items = db.places.filter(p => f === 'all' || (f === 'visited') === !!p.visited);
+  return `<h2>行きたい場所</h2>
+    <div class="nav" style="justify-content:flex-start;gap:6px">${[['all', 'すべて'], ['todo', 'これから'], ['visited', '行った']].map(([k, l]) => `<button data-act="pfilter" data-f="${k}" ${f === k ? 'style="border-color:var(--accent)"' : ''}>${l}</button>`).join('')}</div>
+    <form class="add" data-form="place"><input name="t" placeholder="場所名" required><input name="m" placeholder="メモ"><button class="btn primary">追加</button></form>
+    <ul class="log">${items.length ? items.map(p => `<li class="${p.visited ? 'st-done' : ''}"><button class="sym" data-act="placedone" data-id="${p.id}">${p.visited ? '×' : '○'}</button><span class="txt">${esc(p.name)}${p.memo ? ` <span class="hint">${esc(p.memo)}</span>` : ''}${p.visited ? ` <span class="hint">${p.visited}</span>` : ''}</span><span class="acts">${delBtn('places', p.id)}</span></li>`).join('') : '<li class="empty">まだありません</li>'}</ul>`;
+}
+
+// 総平均法で保有数・平均取得単価・実現損益を計算
+function tradeSummary() {
+  const by = {};
+  [...db.trades].sort((a, b) => a.date.localeCompare(b.date) || a.created - b.created).forEach(t => {
+    const s = by[t.code] || (by[t.code] = { qty: 0, cost: 0, pnl: 0 });
+    if (t.side === 'buy') { s.qty += t.qty; s.cost += t.qty * t.price; }
+    else {
+      const avg = s.qty ? s.cost / s.qty : 0, q = Math.min(t.qty, s.qty);
+      s.pnl += (t.price - avg) * t.qty; s.cost -= avg * q; s.qty -= q;
+    }
+  });
+  return by;
+}
+function viewTrades() {
+  const sum = tradeSummary(), codes = Object.keys(sum);
+  const totalPnl = codes.reduce((s, c) => s + sum[c].pnl, 0);
+  const trades = [...db.trades].sort((a, b) => b.date.localeCompare(a.date) || b.created - a.created);
+  return `<h2>個別株売買リスト</h2>
+    <p>実現損益 合計: <b style="color:${totalPnl >= 0 ? 'var(--ok)' : 'var(--accent)'}">${totalPnl >= 0 ? '+' : ''}${yen(totalPnl)}</b></p>
+    <form class="card" data-form="trade" style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+      <input name="c" placeholder="銘柄 (例: 7203 トヨタ)" required style="grid-column:1/-1;padding:8px;font-size:16px">
+      <select name="s" style="padding:8px;font-size:16px"><option value="buy">買い</option><option value="sell">売り</option></select>
+      <input name="d" type="date" value="${today()}" required style="padding:8px;font-size:16px">
+      <input name="q" type="number" min="1" inputmode="numeric" placeholder="数量(株)" required style="padding:8px;font-size:16px">
+      <input name="p" type="number" min="0" step="any" inputmode="decimal" placeholder="単価(円)" required style="padding:8px;font-size:16px">
+      <input name="m" placeholder="理由・メモ" style="grid-column:1/-1;padding:8px;font-size:16px">
+      <button class="btn primary" style="grid-column:1/-1">記録</button></form>
+    <h3>銘柄ごと</h3>
+    <ul class="log">${codes.length ? codes.map(c => { const s = sum[c]; return `<li><span class="txt">${esc(c)}<br><span class="hint">保有 ${s.qty}株${s.qty ? ` / 平均 ${yen(s.cost / s.qty)}` : ''}</span></span><span class="txt" style="flex:none;text-align:right;color:${s.pnl >= 0 ? 'var(--ok)' : 'var(--accent)'}">${s.pnl >= 0 ? '+' : ''}${yen(s.pnl)}</span></li>`; }).join('') : '<li class="empty">まだありません</li>'}</ul>
+    <h3>売買履歴</h3>
+    <ul class="log">${trades.length ? trades.map(t => `<li><span class="sym">${t.side === 'buy' ? '買' : '売'}</span><span class="txt">${esc(t.code)} ${t.qty}株 @${yen(t.price)}<br><span class="hint">${t.date}${t.memo ? ' ' + esc(t.memo) : ''}</span></span><span class="acts">${delBtn('trades', t.id)}</span></li>`).join('') : '<li class="empty">まだありません</li>'}</ul>`;
+}
+
 // ---- 使い方 ----
 function viewGuide() {
   return `<div class="guide"><h2>使い方</h2>
@@ -182,7 +246,7 @@ function futureMonth(e) {
 // ---- 描画 ----
 function render() {
   document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === state.tab));
-  const v = { daily: viewDaily, monthly: viewMonthly, future: viewFuture, collections: viewCollections, habits: viewHabits, guide: viewGuide }[state.tab];
+  const v = { daily: viewDaily, monthly: viewMonthly, future: viewFuture, wishes: viewWishes, shop: viewShop, places: viewPlaces, trades: viewTrades, collections: viewCollections, habits: viewHabits, guide: viewGuide }[state.tab];
   $('#view').innerHTML = v();
 }
 
@@ -219,6 +283,11 @@ document.addEventListener('click', ev => {
       const url = URL.createObjectURL(new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' }));
       const l = document.createElement('a'); l.href = url; l.download = `bujo-${today()}.json`; l.click(); URL.revokeObjectURL(url); return;
     }
+    case 'wishdone': { const w = db.wishes.find(x => x.id === b.dataset.id); if (w) w.done = !w.done; break; }
+    case 'shopdone': { const s = db.shop.find(x => x.id === b.dataset.id); if (s) s.bought = !s.bought; break; }
+    case 'placedone': { const p = db.places.find(x => x.id === b.dataset.id); if (p) p.visited = p.visited ? '' : today(); break; }
+    case 'pfilter': state.placeFilter = b.dataset.f; break;
+    case 'rm': if (db[b.dataset.list]) db[b.dataset.list] = db[b.dataset.list].filter(x => x.id !== b.dataset.id); break;
     default: return;
   }
   save(); render();
@@ -228,7 +297,7 @@ document.addEventListener('submit', ev => {
   const f = ev.target.closest('[data-form]');
   if (!f) return;
   ev.preventDefault();
-  const raw = f.t.value;
+  const raw = f.elements.t ? f.elements.t.value : f.elements.c.value;
   if (!raw.trim()) return;
   const [kind, arg] = f.dataset.form.split(':');
   if (kind === 'daily') {
@@ -241,6 +310,14 @@ document.addEventListener('submit', ev => {
     db.collections.push({ id: uid(), name: raw.trim(), items: [] });
   } else if (kind === 'colitem') {
     db.collections.find(c => c.id === arg)?.items.push({ id: uid(), text: raw.trim(), done: false });
+  } else if (kind === 'wish') {
+    if (db.wishes.length < 100) db.wishes.push({ id: uid(), text: raw.trim(), done: false });
+  } else if (kind === 'shop') {
+    db.shop.push({ id: uid(), name: raw.trim(), price: Number(f.p.value) || 0, pri: f.r.value, bought: false });
+  } else if (kind === 'place') {
+    db.places.push({ id: uid(), name: raw.trim(), memo: f.m.value.trim(), visited: '' });
+  } else if (kind === 'trade') {
+    db.trades.push({ id: uid(), code: raw.trim(), side: f.s.value, date: f.d.value, qty: Number(f.q.value), price: Number(f.p.value), memo: f.m.value.trim(), created: Date.now() });
   } else if (kind === 'newhabit') {
     db.habits.push({ id: uid(), name: raw.trim(), days: {} });
   }
