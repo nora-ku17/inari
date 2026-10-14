@@ -1,0 +1,6 @@
+{
+  "appId": "jp.example.bujo",
+  "appName": "バレットジャーナル",
+  "webDir": "www",
+  "ios": { "contentInset": "always" }
+}

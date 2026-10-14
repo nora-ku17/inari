@@ -1,0 +1,19 @@
+{
+  "name": "bujo-ios",
+  "version": "0.1.0",
+  "private": true,
+  "description": "バレットジャーナル iOS ラッパー(Capacitor)。Webアプリ本体は ../bujo",
+  "scripts": {
+    "web": "rm -rf www && cp -r ../bujo www && rm -f www/sw.js",
+    "sync": "npm run web && cap sync ios",
+    "open": "cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/core": "latest",
+    "@capacitor/ios": "latest",
+    "@capacitor/preferences": "latest"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "latest"
+  }
+}

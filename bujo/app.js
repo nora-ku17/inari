@@ -1,23 +1,13 @@
 'use strict';
 // バレットジャーナル 叩き台。データは localStorage に保存(端末内のみ)。
-const KEY = 'bujo-v1';
 const SYM = { task: '•', event: '○', note: '–' };
 const STATUS_SYM = { done: '×', migrated: '>', scheduled: '<', cancelled: '•' };
 const $ = (s, r = document) => r.querySelector(s);
 
-let db = load();
+let db = BujoStorage.empty();
 let state = { tab: 'daily', date: today(), month: today().slice(0, 7) };
 
-function load() {
-  try {
-    const d = JSON.parse(localStorage.getItem(KEY));
-    if (d && d.entries) return { wishes: [], shop: [], places: [], trades: [], collections: [], habits: [], ...d };
-  } catch (e) { /* 保存データなし/破損 */ }
-  return { entries: [], collections: [], habits: [], wishes: [], shop: [], places: [], trades: [] };
-}
-function save() {
-  try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { /* 保存不可環境 */ }
-}
+function save() { BujoStorage.save(db); }
 const uid = () => Math.random().toString(36).slice(2, 10);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -218,7 +208,10 @@ function viewGuide() {
     <li><b>月末の見直し</b>: 未完了のタスクを1つずつ「来月へ移行 / 未来へ / 不要なので取消」と判断する。これが核心です。</li>
     <li><b>コレクション・習慣</b>: テーマ別リストと習慣チェック。</li></ol>
     <p class="hint">データはこの端末のブラウザ内にのみ保存されます。</p>
-    <p><button class="btn" data-act="export">データを書き出す(JSON)</button></p></div>`;
+    <p><button class="btn" data-act="export">データを書き出す(JSON)</button>
+    <button class="btn" data-act="import">読み込む</button>
+    <input id="import-file" type="file" accept="application/json,.json" hidden></p>
+    <p class="hint">機種変更やバックアップに。読み込むと今のデータは置き換わります。</p></div>`;
 }
 
 // ---- 月末の見直し(移行ダイアログ) ----
@@ -279,8 +272,9 @@ document.addEventListener('click', ev => {
     case 'delitem': { const c = db.collections.find(c => c.id === b.dataset.id); if (c) c.items = c.items.filter(i => i.id !== b.dataset.item); break; }
     case 'habit': { const h = db.habits.find(h => h.id === b.dataset.id); if (h) { if (h.days[b.dataset.date]) delete h.days[b.dataset.date]; else h.days[b.dataset.date] = true; } break; }
     case 'delhabit': if (confirm('この習慣を削除しますか?')) db.habits = db.habits.filter(h => h.id !== b.dataset.id); break;
+    case 'import': $('#import-file').click(); return;
     case 'export': {
-      const url = URL.createObjectURL(new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' }));
+      const url = URL.createObjectURL(new Blob([BujoStorage.exportJson(db)], { type: 'application/json' }));
       const l = document.createElement('a'); l.href = url; l.download = `bujo-${today()}.json`; l.click(); URL.revokeObjectURL(url); return;
     }
     case 'wishdone': { const w = db.wishes.find(x => x.id === b.dataset.id); if (w) w.done = !w.done; break; }
@@ -324,7 +318,15 @@ document.addEventListener('submit', ev => {
   save(); render();
 });
 
-render();
+document.addEventListener('change', async ev => {
+  if (ev.target.id !== 'import-file' || !ev.target.files[0]) return;
+  const d = BujoStorage.parse(await ev.target.files[0].text());
+  if (!d) { alert('読み込めないファイルです'); return; }
+  if (!confirm('今のデータを、このファイルの内容に置き換えますか?')) return;
+  db = d; save(); render();
+});
+
+BujoStorage.load().then(d => { db = d; render(); });
 
 // オフライン対応(PWA)。file:// など非対応環境では何もしない
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
