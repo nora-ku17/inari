@@ -1,0 +1,51 @@
+:root{--bg:#faf6ee;--paper:#fffdf8;--ink:#2b2b2b;--sub:#8a8478;--line:#e6dfd0;--accent:#c0562b;--ok:#4a7c59}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Sans","Yu Gothic",system-ui,sans-serif;line-height:1.6}
+.app-header{position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--line);padding:8px 16px 0;z-index:5}
+.app-header h1{font-size:16px;margin:0 0 4px;letter-spacing:1px}
+.tabs{display:flex;gap:2px;overflow-x:auto}
+.tabs button{border:0;background:none;padding:8px 12px;font-size:14px;color:var(--sub);border-bottom:2px solid transparent;white-space:nowrap;cursor:pointer}
+.tabs button.on{color:var(--ink);border-color:var(--accent);font-weight:600}
+main{max-width:640px;margin:0 auto;padding:16px 16px 80px}
+h2{font-size:18px;margin:0 0 12px}
+h3{font-size:14px;color:var(--sub);margin:20px 0 6px}
+.nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.nav button,.btn{border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:6px 12px;font-size:14px;cursor:pointer;color:var(--ink)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.add{display:flex;gap:6px;margin:8px 0 12px}
+.add input{flex:1;min-width:0;border:1px solid var(--line);border-radius:8px;padding:9px 10px;font-size:16px;background:var(--paper)}
+.add select{border:1px solid var(--line);border-radius:8px;background:var(--paper);font-size:16px}
+.hint{font-size:12px;color:var(--sub);margin:-6px 0 10px}
+ul.log{list-style:none;margin:0;padding:0;background:var(--paper);border:1px solid var(--line);border-radius:10px}
+ul.log li{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line)}
+ul.log li:last-child{border-bottom:0}
+ul.log .empty{color:var(--sub);font-size:14px}
+.sym{width:26px;height:26px;flex:none;border:0;background:none;font-size:20px;line-height:26px;cursor:pointer;color:var(--ink);padding:0}
+.txt{flex:1;word-break:break-word;padding-top:2px}
+.st-done .txt{color:var(--sub);text-decoration:line-through}
+.st-migrated .txt,.st-scheduled .txt,.st-cancelled .txt{color:var(--sub)}
+.st-cancelled .txt{text-decoration:line-through}
+.pri .txt::before{content:"★ ";color:var(--accent)}
+.acts{display:flex;gap:2px;flex:none}
+.acts button{border:0;background:none;color:var(--sub);font-size:12px;padding:4px 6px;cursor:pointer;border-radius:6px}
+.acts button:hover{background:var(--line)}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:8px}
+.cal .dow{text-align:center;font-size:11px;color:var(--sub)}
+.cal .d{aspect-ratio:1;background:var(--paper);border:1px solid var(--line);border-radius:6px;font-size:13px;padding:2px 4px;cursor:pointer;position:relative;text-align:left}
+.cal .d.today{border-color:var(--accent);font-weight:700}
+.cal .d.blank{background:none;border:0;cursor:default}
+.cal .d i{position:absolute;right:4px;bottom:2px;font-style:normal;font-size:10px;color:var(--accent)}
+.cal .d.ev::after{content:"○";position:absolute;left:4px;bottom:0;font-size:10px;color:var(--ok)}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px}
+.card h3{margin-top:0}
+.habit-grid{overflow-x:auto}
+.habit-grid table{border-collapse:collapse;font-size:11px}
+.habit-grid th,.habit-grid td{padding:2px;text-align:center;min-width:22px}
+.habit-grid td.name{text-align:left;min-width:90px;font-size:13px;padding-right:8px;position:sticky;left:0;background:var(--bg)}
+.habit-grid .cell{width:20px;height:20px;border:1px solid var(--line);border-radius:4px;background:var(--paper);cursor:pointer;padding:0;font-size:12px;line-height:18px}
+.habit-grid .cell.on{background:var(--ok);border-color:var(--ok);color:#fff}
+.guide p,.guide li{font-size:14px}
+.guide table{border-collapse:collapse;margin:8px 0}
+.guide td{border:1px solid var(--line);padding:4px 10px;font-size:14px}
+dialog{border:1px solid var(--line);border-radius:12px;max-width:560px;width:calc(100% - 32px);background:var(--paper);color:var(--ink)}
+dialog::backdrop{background:rgba(0,0,0,.35)}
