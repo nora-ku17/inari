@@ -1,7 +1,7 @@
 // バレットジャーナル Service Worker: アプリ本体をキャッシュしてオフラインでも開けるようにする
 // ファイルを更新したら VERSION を上げてください
-const VERSION = 'bujo-v5';
-const ASSETS = ['./', './index.html', './style.css', './app.js', './storage.js', './manifest.webmanifest',
+const VERSION = 'bujo-v6';
+const ASSETS = ['./', './index.html', './style.css', './app.js', './storage.js', './sync.js', './vendor/firebase-10.14.1.js', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {

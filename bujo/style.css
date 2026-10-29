@@ -56,3 +56,17 @@ ul.log li.wrap{flex-wrap:wrap}
 input[type=color]{width:32px;height:30px;padding:0;border:1px solid var(--line);border-radius:6px;background:none}
 .add input[name=t]{flex:1 1 100%}
 .add input[name=m]{flex:1 1 120px}
+
+.sync-badge{border:1px solid var(--line);background:var(--paper);border-radius:10px;padding:0 8px;font-size:11px;font-weight:400;color:var(--sub);cursor:pointer;margin-left:6px;vertical-align:1px}
+.sync-badge.ok{color:var(--ok);border-color:var(--ok)}
+.sync-badge.err{color:var(--accent);border-color:var(--accent)}
+.sync-form{display:flex;flex-direction:column;gap:8px}
+.sync-form .field{display:flex;flex-direction:column;gap:2px;font-size:13px;color:var(--sub)}
+.sync-form input,.sync-form textarea{border:1px solid var(--line);border-radius:8px;padding:8px;font-size:16px;background:var(--paper);color:var(--ink);font-family:inherit}
+.btn-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.link-btn{border:0;background:none;color:var(--sub);text-decoration:underline;font-size:12px;cursor:pointer;padding:4px}
+.sync-err{color:var(--accent);font-size:13px}
+.sync-note{background:#fff4e0;border:1px solid var(--line);border-radius:8px;padding:8px;font-size:13px;margin:6px 0}
+.sync-card h3{margin-top:0;color:var(--ink)}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#333;color:#fff;padding:8px 14px;border-radius:20px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:20;max-width:90vw;text-align:center}
+#toast.on{opacity:.95}

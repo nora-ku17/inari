@@ -3,15 +3,23 @@
 const SYM = { task: '•', event: '○', note: '–' };
 const STATUS_SYM = { done: '×', migrated: '>', scheduled: '<', cancelled: '•' };
 const $ = (s, r = document) => r.querySelector(s);
-const GENRE_SYMBOLS = ['○', '●', '■', '□', '▲', '△', '◆', '◇', '★', '☆', '♥', '♪', '✚', '☀'];
-const PREFS = ['北海道', '青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県', '茨城県', '栃木県', '群馬県', '埼玉県', '千葉県', '東京都', '神奈川県', '新潟県', '富山県', '石川県', '福井県', '山梨県', '長野県', '岐阜県', '静岡県', '愛知県', '三重県', '滋賀県', '京都府', '大阪府', '兵庫県', '奈良県', '和歌山県', '鳥取県', '島根県', '岡山県', '広島県', '山口県', '徳島県', '香川県', '愛媛県', '高知県', '福岡県', '佐賀県', '長崎県', '熊本県', '大分県', '宮崎県', '鹿児島県', '沖縄県'];
-const ABROAD = '海外';
+const GENRE_SYMBOLS = BujoStorage.SYMBOLS;
+const PREFS = BujoStorage.PREFS;
+const ABROAD = BujoStorage.ABROAD;
 const GENRE_COLORS = ['#3b6ea8', '#d9822b', '#4a7c59', '#8e5ba8', '#c0562b', '#b8962e', '#2f8f9d', '#c2517a'];
 
 let db = BujoStorage.empty();
 let state = { tab: 'daily', date: today(), month: today().slice(0, 7) };
 
-function save() { BujoStorage.save(db); }
+function save() { BujoStorage.save(db); if (window.Sync) Sync.schedulePush(); }
+let toastTimer;
+function toast(msg) {
+  const t = $('#toast');
+  if (!t) return;
+  t.textContent = msg; t.classList.add('on');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('on'), 3000);
+}
+window.toast = toast;
 const uid = () => Math.random().toString(36).slice(2, 10);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -233,7 +241,7 @@ function genreEditor() {
     <form class="add" data-form="newgenre" style="margin-top:8px"><input name="t" placeholder="ジャンル名を追加 (例: 旅行)" required><button class="btn primary">追加</button></form>`;
 }
 function viewGuide() {
-  return `<div class="guide"><h2>設定・使い方</h2>${genreEditor()}
+  return `<div class="guide"><h2>設定・使い方</h2>${window.Sync ? Sync.panel() : ''}${genreEditor()}
     <p>バレットジャーナルは「短く書き出し(ラピッドログ)・毎月見直して移行する」ためのノート術です。</p>
     <table><tr><td>•</td><td>タスク(やること)</td></tr><tr><td>×</td><td>完了</td></tr><tr><td>&gt;</td><td>移行(明日・来月へ持ち越し)</td></tr><tr><td>&lt;</td><td>未来へ(フューチャーログに送る)</td></tr><tr><td>○</td><td>予定・出来事</td></tr><tr><td>–</td><td>メモ</td></tr><tr><td>★</td><td>優先(入力の先頭に * )</td></tr></table>
     <ol><li><b>デイリー</b>: 今日のことを箇条書きで書き出す。</li>
@@ -241,7 +249,7 @@ function viewGuide() {
     <li><b>フューチャー</b>: 先の予定・やりたいこと。月は「+1か月 / +6か月」で増やせます。</li>
     <li><b>月末の見直し</b>: 未完了のタスクを1つずつ「来月へ移行 / 未来へ / 不要なので取消」と判断する。これが核心です。</li>
     <li><b>やりたい100・行きたい場所</b>: 予定月を入れると、その月のマンスリーに出ます。</li></ol>
-    <p class="hint">データはこの端末のブラウザ内にのみ保存されます。</p>
+    <p class="hint">ログインしていないときは、データはこの端末の中にだけ保存されます。</p>
     <p><button class="btn" data-act="export">データを書き出す(JSON)</button>
     <button class="btn" data-act="import">読み込む</button>
     <input id="import-file" type="file" accept="application/json,.json" hidden></p>
@@ -379,7 +387,9 @@ function migrateData(d) {
   d.places.forEach(p => { if (p.visited !== undefined) { p.done = p.done || !!p.visited; p.doneMonth = p.doneMonth || (p.visited || '').slice(0, 7); delete p.visited; } });
   return d;
 }
-BujoStorage.load().then(d => { db = migrateData(d); render(); });
+const loaded = BujoStorage.load().then(d => { db = migrateData(d); render(); });
+// 同期(sync.js)から使う窓口
+window.BujoApp = { loaded, getDb: () => db, render, tab: () => state.tab, goSettings: () => { state.tab = 'guide'; render(); } };
 
 // オフライン対応(PWA)。file:// など非対応環境では何もしない
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
