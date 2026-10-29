@@ -55,7 +55,7 @@ function rowHtml(e, opts = {}) {
   acts.push(`<button data-act="del" data-id="${e.id}" title="削除">削除</button>`);
   return `<li class="st-${e.status}${e.priority ? ' pri' : ''}">
     <button class="sym" data-act="toggle" data-id="${e.id}" aria-label="完了切替">${sym}</button>
-    <span class="txt">${esc(e.text)}</span><span class="acts">${acts.join('')}</span></li>`;
+    <span class="txt">${e.planned && e.date ? `<span class="hint">${Number(e.date.slice(5, 7))}/${Number(e.date.slice(8))}</span> ` : ''}${esc(e.text)}</span><span class="acts">${acts.join('')}</span></li>`;
 }
 function listHtml(arr, opts) {
   const sorted = [...arr].sort((a, b) => (a.type === 'event' ? 0 : 1) - (b.type === 'event' ? 0 : 1) || a.created - b.created);
@@ -89,11 +89,11 @@ function viewMonthly() {
     cells += `<button class="d${ds === today() ? ' today' : ''}${on.some(e => e.type === 'event') ? ' ev' : ''}" data-act="opendate" data-date="${ds}">${i}${open ? `<i>${open}</i>` : ''}</button>`;
   }
   const monthly = db.entries.filter(e => e.month === m && !e.date);
-  const events = db.entries.filter(e => e.date && e.date.startsWith(m) && e.type === 'event').sort((a, b) => a.date.localeCompare(b.date));
+  const events = db.entries.filter(e => e.date && e.date.startsWith(m) && (e.type === 'event' || e.planned)).sort((a, b) => a.date.localeCompare(b.date));
   return `<div class="nav"><button data-act="mon" data-n="-1">‹</button><h2>${fmtMonth(m)}</h2><button data-act="mon" data-n="1">›</button></div>
     <div class="cal">${cells}</div>
     <h3>今月の予定</h3>
-    <ul class="log">${events.length ? events.map(e => `<li><span class="sym">○</span><span class="txt">${parseYmd(e.date).getDate()}日 ${esc(e.text)}</span></li>`).join('') : '<li class="empty">予定なし</li>'}</ul>
+    <ul class="log">${events.length ? events.map(e => `<li class="st-${e.status}"><span class="sym">${e.type === 'task' ? (STATUS_SYM[e.status] || SYM.task) : SYM[e.type]}</span><span class="txt">${parseYmd(e.date).getDate()}日 ${esc(e.text)}</span></li>`).join('') : '<li class="empty">予定なし</li>'}</ul>
     <h3>今月のタスク</h3>
     ${addFormHtml('monthly')}
     ${listHtml(monthly)}
@@ -106,7 +106,7 @@ function viewFuture() {
   let h = '<h2>フューチャーログ</h2><p class="hint">まだ先の予定・やりたいことを月ごとに置いておく場所。その月になったらマンスリーに出てきます。</p>';
   for (let i = 0; i < 6; i++) {
     const m = addMonths(base, i);
-    h += `<div class="card"><h3>${fmtMonth(m)}</h3>${addFormHtml('future:' + m)}${listHtml(db.entries.filter(e => e.month === m && !e.date))}</div>`;
+    h += `<div class="card"><h3>${fmtMonth(m)}</h3>${addFormHtml('future:' + m, `<input type="date" name="d" min="${m}-01" max="${m}-${pad(daysIn(m))}" title="日付(任意)" aria-label="日付(任意)" style="max-width:130px;font-size:14px;border:1px solid var(--line);border-radius:8px;background:var(--paper)">`)}${listHtml(db.entries.filter(e => e.month === m && (e.planned || !e.date)))}</div>`;
   }
   return h;
 }
@@ -299,7 +299,8 @@ document.addEventListener('submit', ev => {
   } else if (kind === 'monthly') {
     const p = parseRapid(raw, 'task'); if (p.text) addEntry({ ...p, month: state.month });
   } else if (kind === 'future') {
-    const p = parseRapid(raw, 'task'); if (p.text) addEntry({ ...p, month: arg });
+    const p = parseRapid(raw, 'task'); const d = f.elements.d && f.elements.d.value;
+    if (p.text) addEntry(d ? { ...p, month: d.slice(0, 7), date: d, planned: true } : { ...p, month: arg });
   } else if (kind === 'newcol') {
     db.collections.push({ id: uid(), name: raw.trim(), items: [] });
   } else if (kind === 'colitem') {
