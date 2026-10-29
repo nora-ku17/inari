@@ -3,6 +3,10 @@
 const SYM = { task: '•', event: '○', note: '–' };
 const STATUS_SYM = { done: '×', migrated: '>', scheduled: '<', cancelled: '•' };
 const $ = (s, r = document) => r.querySelector(s);
+const GENRE_SYMBOLS = ['○', '●', '■', '□', '▲', '△', '◆', '◇', '★', '☆', '♥', '♪', '✚', '☀'];
+const PREFS = ['北海道', '青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県', '茨城県', '栃木県', '群馬県', '埼玉県', '千葉県', '東京都', '神奈川県', '新潟県', '富山県', '石川県', '福井県', '山梨県', '長野県', '岐阜県', '静岡県', '愛知県', '三重県', '滋賀県', '京都府', '大阪府', '兵庫県', '奈良県', '和歌山県', '鳥取県', '島根県', '岡山県', '広島県', '山口県', '徳島県', '香川県', '愛媛県', '高知県', '福岡県', '佐賀県', '長崎県', '熊本県', '大分県', '宮崎県', '鹿児島県', '沖縄県'];
+const ABROAD = '海外';
+const GENRE_COLORS = ['#3b6ea8', '#d9822b', '#4a7c59', '#8e5ba8', '#c0562b', '#b8962e', '#2f8f9d', '#c2517a'];
 
 let db = BujoStorage.empty();
 let state = { tab: 'daily', date: today(), month: today().slice(0, 7) };
@@ -36,6 +40,16 @@ function parseRapid(raw, defType) {
   }
   return { type, priority, text: t.trim() };
 }
+const genreOf = e => e.g && db.genres.find(g => g.id === e.g);
+const genreSelect = (name = 'g', cur = '') => `<select name="${name}" aria-label="ジャンル"><option value="">ジャンルなし</option>${db.genres.map(g => `<option value="${g.id}"${g.id === cur ? ' selected' : ''}>${g.symbol} ${esc(g.name)}</option>`).join('')}</select>`;
+const prefOptions = cur => `<option value="">県を選ぶ</option>${PREFS.concat(ABROAD).map(p => `<option${p === cur ? ' selected' : ''}>${p}</option>`).join('')}`;
+function entrySym(e) {
+  if (e.type === 'task') return STATUS_SYM[e.status] || SYM.task;
+  const g = genreOf(e);
+  return e.type === 'event' && g ? g.symbol : SYM[e.type];
+}
+const symStyle = e => { const g = genreOf(e); return g ? ` style="color:${g.color}"` : ''; };
+const tagHtml = e => { const g = genreOf(e); return g ? ` <span class="tag" style="background:${g.color}">${esc(g.name)}</span>` : ''; };
 function addEntry(fields) {
   db.entries.push({ id: uid(), status: 'open', priority: false, date: null, month: null, created: Date.now(), ...fields });
   save();
@@ -44,7 +58,6 @@ const find = id => db.entries.find(e => e.id === id);
 
 // ---- 共通: 1行の描画 ----
 function rowHtml(e, opts = {}) {
-  const sym = e.type === 'task' ? (STATUS_SYM[e.status] || SYM.task) : SYM[e.type];
   const closed = e.status !== 'open';
   const acts = [];
   if (e.type === 'task' && !closed) {
@@ -54,15 +67,15 @@ function rowHtml(e, opts = {}) {
   if (!closed) acts.push(`<button data-act="cancel" data-id="${e.id}" title="不要になった">取消</button>`);
   acts.push(`<button data-act="del" data-id="${e.id}" title="削除">削除</button>`);
   return `<li class="st-${e.status}${e.priority ? ' pri' : ''}">
-    <button class="sym" data-act="toggle" data-id="${e.id}" aria-label="完了切替">${sym}</button>
-    <span class="txt">${e.planned && e.date ? `<span class="hint">${Number(e.date.slice(5, 7))}/${Number(e.date.slice(8))}</span> ` : ''}${esc(e.text)}</span><span class="acts">${acts.join('')}</span></li>`;
+    <button class="sym" data-act="toggle" data-id="${e.id}" aria-label="完了切替"${symStyle(e)}>${entrySym(e)}</button>
+    <span class="txt">${e.planned && e.date ? `<span class="hint">${Number(e.date.slice(5, 7))}/${Number(e.date.slice(8))}</span> ` : ''}${esc(e.text)}${tagHtml(e)}</span><span class="acts">${acts.join('')}</span></li>`;
 }
 function listHtml(arr, opts) {
   const sorted = [...arr].sort((a, b) => (a.type === 'event' ? 0 : 1) - (b.type === 'event' ? 0 : 1) || a.created - b.created);
   return `<ul class="log">${sorted.length ? sorted.map(e => rowHtml(e, opts)).join('') : '<li class="empty">まだ何もありません</li>'}</ul>`;
 }
 function addFormHtml(id, extra = '') {
-  return `<form class="add" data-form="${id}"><input name="t" placeholder="書き出す… (例: o 15時 歯医者 / - メモ / * 大事なタスク)" autocomplete="off" required>${extra}<button class="btn primary">追加</button></form>`;
+  return `<form class="add" data-form="${id}"><input name="t" placeholder="書き出す… (例: o 15時 歯医者 / - メモ / * 大事なタスク)" autocomplete="off" required>${extra}${genreSelect()}<button class="btn primary">追加</button></form>`;
 }
 
 // ---- デイリー ----
@@ -86,64 +99,51 @@ function viewMonthly() {
     const ds = `${m}-${pad(i)}`;
     const on = db.entries.filter(e => e.date === ds);
     const open = on.filter(e => e.type === 'task' && e.status === 'open').length;
-    cells += `<button class="d${ds === today() ? ' today' : ''}${on.some(e => e.type === 'event') ? ' ev' : ''}" data-act="opendate" data-date="${ds}">${i}${open ? `<i>${open}</i>` : ''}</button>`;
+    const mk = on.filter(e => e.type === 'event').slice(0, 3).map(e => `<b${symStyle(e)}>${entrySym(e)}</b>`).join('');
+    cells += `<button class="d${ds === today() ? ' today' : ''}" data-act="opendate" data-date="${ds}">${i}${open ? `<i>${open}</i>` : ''}${mk ? `<span class="mk">${mk}</span>` : ''}</button>`;
   }
   const monthly = db.entries.filter(e => e.month === m && !e.date);
   const events = db.entries.filter(e => e.date && e.date.startsWith(m) && (e.type === 'event' || e.planned)).sort((a, b) => a.date.localeCompare(b.date));
   return `<div class="nav"><button data-act="mon" data-n="-1">‹</button><h2>${fmtMonth(m)}</h2><button data-act="mon" data-n="1">›</button></div>
     <div class="cal">${cells}</div>
     <h3>今月の予定</h3>
-    <ul class="log">${events.length ? events.map(e => `<li class="st-${e.status}"><span class="sym">${e.type === 'task' ? (STATUS_SYM[e.status] || SYM.task) : SYM[e.type]}</span><span class="txt">${parseYmd(e.date).getDate()}日 ${esc(e.text)}</span></li>`).join('') : '<li class="empty">予定なし</li>'}</ul>
+    <ul class="log">${events.length ? events.map(e => `<li class="st-${e.status}"><span class="sym"${symStyle(e)}>${entrySym(e)}</span><span class="txt">${parseYmd(e.date).getDate()}日 ${esc(e.text)}${tagHtml(e)}</span></li>`).join('') : '<li class="empty">予定なし</li>'}</ul>
+    ${monthlyPlans(m)}
     <h3>今月のタスク</h3>
     ${addFormHtml('monthly')}
     ${listHtml(monthly)}
     <p><button class="btn" data-act="review">月末の見直し・移行</button></p>`;
 }
 
-// ---- フューチャー(今月から6か月) ----
+// ---- フューチャー(今月から。月数は自分で増やせる) ----
 function viewFuture() {
   const base = today().slice(0, 7);
   let h = '<h2>フューチャーログ</h2><p class="hint">まだ先の予定・やりたいことを月ごとに置いておく場所。その月になったらマンスリーに出てきます。</p>';
-  for (let i = 0; i < 6; i++) {
+  const count = db.settings.futureCount;
+  for (let i = 0; i < count; i++) {
     const m = addMonths(base, i);
     h += `<div class="card"><h3>${fmtMonth(m)}</h3>${addFormHtml('future:' + m, `<input type="date" name="d" min="${m}-01" max="${m}-${pad(daysIn(m))}" title="日付(任意)" aria-label="日付(任意)" style="max-width:130px;font-size:14px;border:1px solid var(--line);border-radius:8px;background:var(--paper)">`)}${listHtml(db.entries.filter(e => e.month === m && (e.planned || !e.date)))}</div>`;
   }
+  const last = addMonths(base, count - 1);
+  const lastUsed = db.entries.some(e => e.month === last);
+  h += `<div class="nav" style="justify-content:center;gap:8px"><button data-act="fadd" data-n="1">+1か月</button><button data-act="fadd" data-n="6">+6か月</button>${count > 1 && !lastUsed ? '<button data-act="fsub">−1か月</button>' : ''}</div><p class="hint" style="text-align:center">${fmtMonth(last)}まで表示中</p>`;
   return h;
 }
-
-// ---- コレクション ----
-function viewCollections() {
-  const cols = db.collections.map(c => `<div class="card"><h3>${esc(c.name)} <button class="acts-del btn" data-act="delcol" data-id="${c.id}" style="float:right;font-size:12px">削除</button></h3>
-    <ul class="log">${c.items.length ? c.items.map(it => `<li class="${it.done ? 'st-done' : ''}"><button class="sym" data-act="colitem" data-id="${c.id}" data-item="${it.id}">${it.done ? '×' : '•'}</button><span class="txt">${esc(it.text)}</span><span class="acts"><button data-act="delitem" data-id="${c.id}" data-item="${it.id}">削除</button></span></li>`).join('') : '<li class="empty">空です</li>'}</ul>
-    <form class="add" data-form="colitem:${c.id}" style="margin-bottom:0"><input name="t" placeholder="項目を追加" required><button class="btn primary">追加</button></form></div>`).join('');
-  return `<h2>コレクション</h2><p class="hint">読みたい本・行きたい場所・買い物リストなど、テーマ別のリスト。</p>
-    <form class="add" data-form="newcol"><input name="t" placeholder="新しいコレクション名 (例: 読みたい本)" required><button class="btn primary">作成</button></form>${cols}`;
-}
-
-// ---- 習慣トラッカー ----
-function viewHabits() {
-  const m = state.month, n = daysIn(m);
-  const head = Array.from({ length: n }, (_, i) => `<th>${i + 1}</th>`).join('');
-  const rows = db.habits.map(h => `<tr><td class="name">${esc(h.name)} <button class="btn" data-act="delhabit" data-id="${h.id}" style="font-size:10px;padding:0 4px">×</button></td>${Array.from({ length: n }, (_, i) => {
-    const ds = `${m}-${pad(i + 1)}`;
-    return `<td><button class="cell${h.days[ds] ? ' on' : ''}" data-act="habit" data-id="${h.id}" data-date="${ds}">${h.days[ds] ? '✓' : ''}</button></td>`;
-  }).join('')}</tr>`).join('');
-  return `<div class="nav"><button data-act="mon" data-n="-1">‹</button><h2>${fmtMonth(m)}の習慣</h2><button data-act="mon" data-n="1">›</button></div>
-    <form class="add" data-form="newhabit"><input name="t" placeholder="習慣を追加 (例: 早起き)" required><button class="btn primary">追加</button></form>
-    <div class="habit-grid">${db.habits.length ? `<table><tr><th></th>${head}</tr>${rows}</table>` : '<p class="hint">習慣を追加すると、日ごとにチェックできます。</p>'}</div>`;
-}
-
 
 // ---- やりたいこと100 / 買いたいもの / 行きたい場所 / 個別株売買 ----
 const yen = n => '¥' + Math.round(n).toLocaleString('ja-JP');
 const delBtn = (list, id) => `<button data-act="rm" data-list="${list}" data-id="${id}">削除</button>`;
 
+const monthField = (list, id, key, val) => `<input type="month" value="${val || ''}" data-set="${list}" data-id="${id}" data-key="${key}" aria-label="${key === 'plan' ? '予定月' : '達成月'}">`;
+const subLine = (list, it) => `<div class="sub"><label>予定月 ${monthField(list, it.id, 'plan', it.plan)}</label><label>達成月 ${monthField(list, it.id, 'doneMonth', it.doneMonth)}</label></div>`;
+
 function viewWishes() {
   const done = db.wishes.filter(w => w.done).length, total = 100;
   return `<h2>2026年やりたいこと100</h2>
     <p><b>${done}</b> / ${total} 達成 <progress value="${done}" max="${total}" style="width:100%"></progress></p>
-    ${db.wishes.length < total ? `<form class="add" data-form="wish"><input name="t" placeholder="やりたいこと (あと${total - db.wishes.length}個)" required><button class="btn primary">追加</button></form>` : '<p class="hint">100個そろいました!</p>'}
-    <ul class="log">${db.wishes.length ? db.wishes.map((w, i) => `<li class="${w.done ? 'st-done' : ''}"><span class="hint" style="width:26px;margin:0;flex:none;text-align:right">${i + 1}</span><button class="sym" data-act="wishdone" data-id="${w.id}">${w.done ? '×' : '•'}</button><span class="txt">${esc(w.text)}</span><span class="acts">${delBtn('wishes', w.id)}</span></li>`).join('') : '<li class="empty">まだありません</li>'}</ul>`;
+    ${db.wishes.length < total ? `<form class="add" data-form="wish"><input name="t" placeholder="やりたいこと (あと${total - db.wishes.length}個)" required><label class="fld">予定月 <input type="month" name="plan"></label><button class="btn primary">追加</button></form>` : '<p class="hint">100個そろいました!</p>'}
+    <p class="hint">予定月を入れると、その月のマンスリーに出ます。完了にすると達成月が入ります。</p>
+    <ul class="log">${db.wishes.length ? db.wishes.map((w, i) => `<li class="wrap ${w.done ? 'st-done' : ''}"><span class="hint" style="width:26px;margin:0;flex:none;text-align:right">${i + 1}</span><button class="sym" data-act="wishdone" data-id="${w.id}">${w.done ? '×' : '•'}</button><span class="txt">${esc(w.text)}</span><span class="acts">${delBtn('wishes', w.id)}</span>${subLine('wishes', w)}</li>`).join('') : '<li class="empty">まだありません</li>'}</ul>`;
 }
 
 function viewShop() {
@@ -156,12 +156,24 @@ function viewShop() {
 }
 
 function viewPlaces() {
-  const f = state.placeFilter || 'all';
-  const items = db.places.filter(p => f === 'all' || (f === 'visited') === !!p.visited);
+  const f = state.placeFilter || 'all', fp = state.placePref || '';
+  const items = db.places.filter(p => (f === 'all' || (f === 'visited') === !!p.done) && (!fp || p.pref === fp));
+  const visited = new Set(db.places.filter(p => p.done && PREFS.includes(p.pref)).map(p => p.pref)).size;
   return `<h2>行きたい場所</h2>
-    <div class="nav" style="justify-content:flex-start;gap:6px">${[['all', 'すべて'], ['todo', 'これから'], ['visited', '行った']].map(([k, l]) => `<button data-act="pfilter" data-f="${k}" ${f === k ? 'style="border-color:var(--accent)"' : ''}>${l}</button>`).join('')}</div>
-    <form class="add" data-form="place"><input name="t" placeholder="場所名" required><input name="m" placeholder="メモ"><button class="btn primary">追加</button></form>
-    <ul class="log">${items.length ? items.map(p => `<li class="${p.visited ? 'st-done' : ''}"><button class="sym" data-act="placedone" data-id="${p.id}">${p.visited ? '×' : '○'}</button><span class="txt">${esc(p.name)}${p.memo ? ` <span class="hint">${esc(p.memo)}</span>` : ''}${p.visited ? ` <span class="hint">${p.visited}</span>` : ''}</span><span class="acts">${delBtn('places', p.id)}</span></li>`).join('') : '<li class="empty">まだありません</li>'}</ul>`;
+    <p>行った都道府県: <b>${visited}</b> / 47</p>
+    <div class="nav" style="justify-content:flex-start;gap:6px;flex-wrap:wrap">${[['all', 'すべて'], ['todo', 'これから'], ['visited', '行った']].map(([k, l]) => `<button data-act="pfilter" data-f="${k}" ${f === k ? 'style="border-color:var(--accent)"' : ''}>${l}</button>`).join('')}
+      <select data-filter="pref" aria-label="県で絞り込み"><option value="">全県</option>${PREFS.concat(ABROAD).map(p => `<option${p === fp ? ' selected' : ''}>${p}</option>`).join('')}</select></div>
+    <form class="add" data-form="place"><input name="t" placeholder="場所名" required><select name="pref" aria-label="県">${prefOptions('')}</select><label class="fld">予定月 <input type="month" name="plan"></label><input name="m" placeholder="メモ"><button class="btn primary">追加</button></form>
+    <p class="hint">予定月を入れると、その月のマンスリーに出ます。行ったら○をタップすると達成月が入ります。</p>
+    <ul class="log">${items.length ? items.map(p => `<li class="wrap ${p.done ? 'st-done' : ''}"><button class="sym" data-act="placedone" data-id="${p.id}">${p.done ? '×' : '○'}</button><span class="txt">${esc(p.name)}${p.pref ? ` <span class="tag" style="background:var(--sub)">${p.pref}</span>` : ''}${p.memo ? ` <span class="hint">${esc(p.memo)}</span>` : ''}</span><span class="acts">${delBtn('places', p.id)}</span>${subLine('places', p)}</li>`).join('') : '<li class="empty">まだありません</li>'}</ul>`;
+}
+
+// マンスリーに出す: 予定月/達成月がその月のやりたいこと・行きたい場所
+function monthlyPlans(m) {
+  const mk = (title, list, arr, sym0) => `<h3>${title}</h3><ul class="log">${arr.length ? arr.map(x => `<li class="${x.done ? 'st-done' : ''}"><button class="sym" data-act="${list === 'wishes' ? 'wishdone' : 'placedone'}" data-id="${x.id}">${x.done ? '×' : sym0}</button><span class="txt">${esc(x.text || x.name)}${x.pref ? ` <span class="tag" style="background:var(--sub)">${x.pref}</span>` : ''}${x.doneMonth === m ? ' <span class="hint">達成</span>' : ''}</span></li>`).join('') : '<li class="empty">なし</li>'}</ul>`;
+  const w = db.wishes.filter(x => x.plan === m || x.doneMonth === m);
+  const p = db.places.filter(x => x.plan === m || x.doneMonth === m);
+  return mk('今月やりたいこと', 'wishes', w, '•') + mk('今月行きたい場所', 'places', p, '○');
 }
 
 // 総平均法で保有数・平均取得単価・実現損益を計算
@@ -198,15 +210,24 @@ function viewTrades() {
 }
 
 // ---- 使い方 ----
+function genreEditor() {
+  return `<h3>ジャンル(予定の色と記号)</h3>
+    <p class="hint">予定やタスクを入れるとき、ジャンルを選ぶと色と記号が付きます。</p>
+    <ul class="log">${db.genres.length ? db.genres.map(g => `<li><input type="color" value="${g.color}" data-gset="color" data-id="${g.id}" aria-label="色">
+      <select data-gset="symbol" data-id="${g.id}" aria-label="記号">${GENRE_SYMBOLS.map(s => `<option${s === g.symbol ? ' selected' : ''}>${s}</option>`).join('')}</select>
+      <input value="${esc(g.name)}" data-gset="name" data-id="${g.id}" aria-label="名前" style="flex:1;min-width:0;border:1px solid var(--line);border-radius:6px;padding:4px 6px;font-size:16px">
+      <span class="acts"><button data-act="gdel" data-id="${g.id}">削除</button></span></li>`).join('') : '<li class="empty">ジャンルなし</li>'}</ul>
+    <form class="add" data-form="newgenre" style="margin-top:8px"><input name="t" placeholder="ジャンル名を追加 (例: 旅行)" required><button class="btn primary">追加</button></form>`;
+}
 function viewGuide() {
-  return `<div class="guide"><h2>使い方</h2>
+  return `<div class="guide"><h2>設定・使い方</h2>${genreEditor()}
     <p>バレットジャーナルは「短く書き出し(ラピッドログ)・毎月見直して移行する」ためのノート術です。</p>
     <table><tr><td>•</td><td>タスク(やること)</td></tr><tr><td>×</td><td>完了</td></tr><tr><td>&gt;</td><td>移行(明日・来月へ持ち越し)</td></tr><tr><td>&lt;</td><td>未来へ(フューチャーログに送る)</td></tr><tr><td>○</td><td>予定・出来事</td></tr><tr><td>–</td><td>メモ</td></tr><tr><td>★</td><td>優先(入力の先頭に * )</td></tr></table>
     <ol><li><b>デイリー</b>: 今日のことを箇条書きで書き出す。</li>
     <li><b>マンスリー</b>: カレンダーで1か月を俯瞰し、今月のタスクを置く。</li>
-    <li><b>フューチャー</b>: 半年先までの予定・やりたいこと。</li>
+    <li><b>フューチャー</b>: 先の予定・やりたいこと。月は「+1か月 / +6か月」で増やせます。</li>
     <li><b>月末の見直し</b>: 未完了のタスクを1つずつ「来月へ移行 / 未来へ / 不要なので取消」と判断する。これが核心です。</li>
-    <li><b>コレクション・習慣</b>: テーマ別リストと習慣チェック。</li></ol>
+    <li><b>やりたい100・行きたい場所</b>: 予定月を入れると、その月のマンスリーに出ます。</li></ol>
     <p class="hint">データはこの端末のブラウザ内にのみ保存されます。</p>
     <p><button class="btn" data-act="export">データを書き出す(JSON)</button>
     <button class="btn" data-act="import">読み込む</button>
@@ -226,8 +247,13 @@ function openReview() {
   dlg.dataset.next = next;
   if (!dlg.open) dlg.showModal();
 }
+// 完了にしたら達成月を今月に。戻したら達成月を消す
+function toggleDone(x) {
+  x.done = !x.done;
+  x.doneMonth = x.done ? (x.doneMonth || today().slice(0, 7)) : '';
+}
 function migrateTo(e, fields, status) {
-  addEntry({ type: 'task', text: e.text, priority: e.priority, ...fields });
+  addEntry({ type: 'task', text: e.text, priority: e.priority, g: e.g || '', ...fields });
   e.status = status;
 }
 function futureMonth(e) {
@@ -239,7 +265,7 @@ function futureMonth(e) {
 // ---- 描画 ----
 function render() {
   document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === state.tab));
-  const v = { daily: viewDaily, monthly: viewMonthly, future: viewFuture, wishes: viewWishes, shop: viewShop, places: viewPlaces, trades: viewTrades, collections: viewCollections, habits: viewHabits, guide: viewGuide }[state.tab];
+  const v = { daily: viewDaily, monthly: viewMonthly, future: viewFuture, wishes: viewWishes, shop: viewShop, places: viewPlaces, trades: viewTrades, guide: viewGuide }[state.tab];
   $('#view').innerHTML = v();
 }
 
@@ -267,19 +293,17 @@ document.addEventListener('click', ev => {
     case 'mig-next': if (e) migrateTo(e, { month: $('#migrate-dialog').dataset.next }, 'migrated'); save(); openReview(); return;
     case 'mig-future': if (e) migrateTo(e, { month: addMonths($('#migrate-dialog').dataset.next, 1) }, 'scheduled'); save(); openReview(); return;
     case 'mig-cancel': if (e) e.status = 'cancelled'; save(); openReview(); return;
-    case 'delcol': db.collections = db.collections.filter(c => c.id !== b.dataset.id); break;
-    case 'colitem': { const it = db.collections.find(c => c.id === b.dataset.id)?.items.find(i => i.id === b.dataset.item); if (it) it.done = !it.done; break; }
-    case 'delitem': { const c = db.collections.find(c => c.id === b.dataset.id); if (c) c.items = c.items.filter(i => i.id !== b.dataset.item); break; }
-    case 'habit': { const h = db.habits.find(h => h.id === b.dataset.id); if (h) { if (h.days[b.dataset.date]) delete h.days[b.dataset.date]; else h.days[b.dataset.date] = true; } break; }
-    case 'delhabit': if (confirm('この習慣を削除しますか?')) db.habits = db.habits.filter(h => h.id !== b.dataset.id); break;
     case 'import': $('#import-file').click(); return;
     case 'export': {
       const url = URL.createObjectURL(new Blob([BujoStorage.exportJson(db)], { type: 'application/json' }));
       const l = document.createElement('a'); l.href = url; l.download = `bujo-${today()}.json`; l.click(); URL.revokeObjectURL(url); return;
     }
-    case 'wishdone': { const w = db.wishes.find(x => x.id === b.dataset.id); if (w) w.done = !w.done; break; }
+    case 'wishdone': { const w = db.wishes.find(x => x.id === b.dataset.id); if (w) toggleDone(w); break; }
     case 'shopdone': { const s = db.shop.find(x => x.id === b.dataset.id); if (s) s.bought = !s.bought; break; }
-    case 'placedone': { const p = db.places.find(x => x.id === b.dataset.id); if (p) p.visited = p.visited ? '' : today(); break; }
+    case 'placedone': { const p = db.places.find(x => x.id === b.dataset.id); if (p) toggleDone(p); break; }
+    case 'fadd': db.settings.futureCount += +b.dataset.n; break;
+    case 'fsub': db.settings.futureCount = Math.max(1, db.settings.futureCount - 1); break;
+    case 'gdel': db.genres = db.genres.filter(g => g.id !== b.dataset.id); break;
     case 'pfilter': state.placeFilter = b.dataset.f; break;
     case 'rm': if (db[b.dataset.list]) db[b.dataset.list] = db[b.dataset.list].filter(x => x.id !== b.dataset.id); break;
     default: return;
@@ -294,40 +318,55 @@ document.addEventListener('submit', ev => {
   const raw = f.elements.t ? f.elements.t.value : f.elements.c.value;
   if (!raw.trim()) return;
   const [kind, arg] = f.dataset.form.split(':');
+  const g = f.elements.g ? f.elements.g.value : '';
   if (kind === 'daily') {
-    const p = parseRapid(raw, 'task'); if (p.text) addEntry({ ...p, date: state.date });
+    const p = parseRapid(raw, 'task'); if (p.text) addEntry({ ...p, g, date: state.date });
   } else if (kind === 'monthly') {
-    const p = parseRapid(raw, 'task'); if (p.text) addEntry({ ...p, month: state.month });
+    const p = parseRapid(raw, 'task'); if (p.text) addEntry({ ...p, g, month: state.month });
   } else if (kind === 'future') {
     const p = parseRapid(raw, 'task'); const d = f.elements.d && f.elements.d.value;
-    if (p.text) addEntry(d ? { ...p, month: d.slice(0, 7), date: d, planned: true } : { ...p, month: arg });
-  } else if (kind === 'newcol') {
-    db.collections.push({ id: uid(), name: raw.trim(), items: [] });
-  } else if (kind === 'colitem') {
-    db.collections.find(c => c.id === arg)?.items.push({ id: uid(), text: raw.trim(), done: false });
+    if (p.text) addEntry(d ? { ...p, g, month: d.slice(0, 7), date: d, planned: true } : { ...p, g, month: arg });
   } else if (kind === 'wish') {
-    if (db.wishes.length < 100) db.wishes.push({ id: uid(), text: raw.trim(), done: false });
+    if (db.wishes.length < 100) db.wishes.push({ id: uid(), text: raw.trim(), done: false, plan: f.plan.value, doneMonth: '' });
   } else if (kind === 'shop') {
     db.shop.push({ id: uid(), name: raw.trim(), price: Number(f.p.value) || 0, pri: f.r.value, bought: false });
   } else if (kind === 'place') {
-    db.places.push({ id: uid(), name: raw.trim(), memo: f.m.value.trim(), visited: '' });
+    db.places.push({ id: uid(), name: raw.trim(), pref: f.pref.value, memo: f.m.value.trim(), plan: f.plan.value, done: false, doneMonth: '' });
+  } else if (kind === 'newgenre') {
+    const n = db.genres.length;
+    db.genres.push({ id: uid(), name: raw.trim(), color: GENRE_COLORS[n % GENRE_COLORS.length], symbol: GENRE_SYMBOLS[n % GENRE_SYMBOLS.length] });
   } else if (kind === 'trade') {
     db.trades.push({ id: uid(), code: raw.trim(), side: f.s.value, date: f.d.value, qty: Number(f.q.value), price: Number(f.p.value), memo: f.m.value.trim(), created: Date.now() });
-  } else if (kind === 'newhabit') {
-    db.habits.push({ id: uid(), name: raw.trim(), days: {} });
   }
   save(); render();
 });
 
 document.addEventListener('change', async ev => {
-  if (ev.target.id !== 'import-file' || !ev.target.files[0]) return;
+  const t = ev.target;
+  if (t.dataset.set) {                       // やりたい/行きたいの予定月・達成月
+    const x = db[t.dataset.set].find(i => i.id === t.dataset.id);
+    if (x) { x[t.dataset.key] = t.value; if (t.dataset.key === 'doneMonth') x.done = !!t.value; save(); render(); }
+    return;
+  }
+  if (t.dataset.gset) {                      // ジャンルの名前・色・記号
+    const g = db.genres.find(i => i.id === t.dataset.id);
+    if (g) { g[t.dataset.gset] = t.dataset.gset === 'name' ? (t.value.trim() || g.name) : t.value; save(); render(); }
+    return;
+  }
+  if (t.dataset.filter === 'pref') { state.placePref = t.value; render(); return; }
+  if (t.id !== 'import-file' || !t.files[0]) return;
   const d = BujoStorage.parse(await ev.target.files[0].text());
   if (!d) { alert('読み込めないファイルです'); return; }
   if (!confirm('今のデータを、このファイルの内容に置き換えますか?')) return;
-  db = d; save(); render();
+  db = migrateData(d); save(); render();
 });
 
-BujoStorage.load().then(d => { db = d; render(); });
+// 旧データの引き継ぎ(行きたい場所: visited(日付) → done / doneMonth)
+function migrateData(d) {
+  d.places.forEach(p => { if (p.visited !== undefined) { p.done = p.done || !!p.visited; p.doneMonth = p.doneMonth || (p.visited || '').slice(0, 7); delete p.visited; } });
+  return d;
+}
+BujoStorage.load().then(d => { db = migrateData(d); render(); });
 
 // オフライン対応(PWA)。file:// など非対応環境では何もしない
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
