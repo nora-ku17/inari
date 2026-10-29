@@ -1,5 +1,6 @@
 rules_version = '2';
-// かぞく手帳 用の Firestore セキュリティルール
+// かぞく手帳 + バレットジャーナル 用の Firestore セキュリティルール
+// (かぞく手帳と同じFirebaseプロジェクトを使うため、1つのルールにまとめています)
 // 家族ドキュメントの emails に入っているメールアドレスでログインし、
 // そのメールアドレスの確認（メール内リンクのクリック）を済ませた人だけが、その家族のデータを読み書きできます。
 service cloud.firestore {
@@ -15,6 +16,13 @@ service cloud.firestore {
     function isFamilyMember(fid) {
       return signedIn() &&
         myEmail() in get(/databases/$(database)/documents/families/$(fid)).data.emails;
+    }
+
+    // ---- バレットジャーナル用: 自分(uid)のデータだけ、メール確認済みのアカウントだけ読み書きできる ----
+    match /users/{uid}/{col}/{docId} {
+      allow read, write: if signedIn()
+        && request.auth.uid == uid
+        && col in ['entries', 'wishes', 'shop', 'places', 'trades', 'genres', 'config'];
     }
 
     match /families/{fid} {

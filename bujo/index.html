@@ -16,7 +16,7 @@
 </head>
 <body>
 <header class="app-header">
-  <h1>• バレットジャーナル</h1>
+  <h1>• バレットジャーナル <button id="sync-badge" class="sync-badge" data-tab="guide" hidden></button></h1>
   <nav class="tabs" aria-label="メニュー">
     <button data-tab="daily">デイリー</button>
     <button data-tab="monthly">マンスリー</button>
@@ -29,8 +29,10 @@
   </nav>
 </header>
 <main id="view"></main>
+<div id="toast" role="status"></div>
 <dialog id="migrate-dialog"></dialog>
 <script src="storage.js"></script>
 <script src="app.js"></script>
+<script src="sync.js"></script>
 </body>
 </html>
