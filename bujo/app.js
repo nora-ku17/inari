@@ -92,15 +92,28 @@ function viewDaily() {
 }
 
 // ---- マンスリー ----
+// 日ごとの「記号+件数」。同じ記号・色は1つにまとめて件数を付ける(予定を先に、取消・移行済みは数えない)
+function dayMarks(on) {
+  const groups = new Map();
+  on.filter(e => !['cancelled', 'migrated', 'scheduled'].includes(e.status))
+    .sort((a, b) => (a.type === 'event' ? 0 : 1) - (b.type === 'event' ? 0 : 1))
+    .forEach(e => {
+      const g = genreOf(e);
+      const sym = e.type === 'event' ? entrySym(e) : e.type === 'note' ? SYM.note : SYM.task;
+      const key = sym + (g ? g.color : '');
+      const x = groups.get(key) || { sym, color: g ? g.color : '', n: 0 };
+      x.n++; groups.set(key, x);
+    });
+  if (!groups.size) return '';
+  return `<span class="mk">${[...groups.values()].map(x => `<b${x.color ? ` style="color:${x.color}"` : ''}>${x.sym}<small>${x.n}</small></b>`).join('')}</span>`;
+}
 function viewMonthly() {
   const m = state.month, first = parseYmd(m + '-01').getDay(), n = daysIn(m);
   let cells = DOW.map(x => `<div class="dow">${x}</div>`).join('') + '<div class="d blank"></div>'.repeat(first);
   for (let i = 1; i <= n; i++) {
     const ds = `${m}-${pad(i)}`;
     const on = db.entries.filter(e => e.date === ds);
-    const open = on.filter(e => e.type === 'task' && e.status === 'open').length;
-    const mk = on.filter(e => e.type === 'event').slice(0, 3).map(e => `<b${symStyle(e)}>${entrySym(e)}</b>`).join('');
-    cells += `<button class="d${ds === today() ? ' today' : ''}" data-act="opendate" data-date="${ds}">${i}${open ? `<i>${open}</i>` : ''}${mk ? `<span class="mk">${mk}</span>` : ''}</button>`;
+    cells += `<button class="d${ds === today() ? ' today' : ''}" data-act="opendate" data-date="${ds}">${i}${dayMarks(on)}</button>`;
   }
   const monthly = db.entries.filter(e => e.month === m && !e.date);
   const events = db.entries.filter(e => e.date && e.date.startsWith(m) && (e.type === 'event' || e.planned)).sort((a, b) => a.date.localeCompare(b.date));
