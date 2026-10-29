@@ -35,17 +35,24 @@ ul.log .empty{color:var(--sub);font-size:14px}
 .cal .d.today{border-color:var(--accent);font-weight:700}
 .cal .d.blank{background:none;border:0;cursor:default}
 .cal .d i{position:absolute;right:4px;bottom:2px;font-style:normal;font-size:10px;color:var(--accent)}
-.cal .d.ev::after{content:"○";position:absolute;left:4px;bottom:0;font-size:10px;color:var(--ok)}
+.cal .d .mk{position:absolute;left:3px;bottom:1px;font-size:10px;line-height:1;white-space:nowrap}
+.cal .d .mk b{font-weight:400}
 .card{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px}
 .card h3{margin-top:0}
-.habit-grid{overflow-x:auto}
-.habit-grid table{border-collapse:collapse;font-size:11px}
-.habit-grid th,.habit-grid td{padding:2px;text-align:center;min-width:22px}
-.habit-grid td.name{text-align:left;min-width:90px;font-size:13px;padding-right:8px;position:sticky;left:0;background:var(--bg)}
-.habit-grid .cell{width:20px;height:20px;border:1px solid var(--line);border-radius:4px;background:var(--paper);cursor:pointer;padding:0;font-size:12px;line-height:18px}
-.habit-grid .cell.on{background:var(--ok);border-color:var(--ok);color:#fff}
 .guide p,.guide li{font-size:14px}
 .guide table{border-collapse:collapse;margin:8px 0}
 .guide td{border:1px solid var(--line);padding:4px 10px;font-size:14px}
 dialog{border:1px solid var(--line);border-radius:12px;max-width:560px;width:calc(100% - 32px);background:var(--paper);color:var(--ink)}
 dialog::backdrop{background:rgba(0,0,0,.35)}
+
+.add{flex-wrap:wrap}
+.add select{padding:6px;max-width:100%}
+.fld{display:flex;align-items:center;gap:4px;font-size:13px;color:var(--sub)}
+.fld input{border:1px solid var(--line);border-radius:8px;padding:6px;font-size:14px;background:var(--paper)}
+.tag{display:inline-block;color:#fff;font-size:11px;line-height:1.5;padding:0 6px;border-radius:8px;vertical-align:1px}
+ul.log li.wrap{flex-wrap:wrap}
+.sub{flex-basis:100%;display:flex;gap:10px;flex-wrap:wrap;padding-left:60px;font-size:12px;color:var(--sub)}
+.sub input{border:1px solid var(--line);border-radius:6px;padding:2px 4px;font-size:13px;background:var(--paper);color:var(--ink)}
+input[type=color]{width:32px;height:30px;padding:0;border:1px solid var(--line);border-radius:6px;background:none}
+.add input[name=t]{flex:1 1 100%}
+.add input[name=m]{flex:1 1 120px}

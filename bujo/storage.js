@@ -6,7 +6,15 @@
 (function () {
   const KEY = 'bujo-v1';
   const VERSION = 1;
-  const empty = () => ({ version: VERSION, entries: [], collections: [], habits: [], wishes: [], shop: [], places: [], trades: [] });
+  const empty = () => ({ version: VERSION, entries: [], wishes: [], shop: [], places: [], trades: [],
+    settings: { futureCount: 6 },
+    genres: [
+      { id: 'g1', name: '仕事', color: '#3b6ea8', symbol: '■' },
+      { id: 'g2', name: '家族', color: '#d9822b', symbol: '♥' },
+      { id: 'g3', name: '友人', color: '#4a7c59', symbol: '◆' },
+      { id: 'g4', name: '趣味', color: '#8e5ba8', symbol: '★' },
+      { id: 'g5', name: '健康', color: '#c0562b', symbol: '▲' }
+    ] });
 
   const cap = window.Capacitor;
   // ネイティブ側の Preferences プラグインを(バンドラなしで)名前で呼び出す
@@ -19,7 +27,7 @@
   function normalize(raw) {
     try {
       const d = JSON.parse(raw);
-      if (d && Array.isArray(d.entries)) return { ...empty(), ...d, version: VERSION };
+      if (d && Array.isArray(d.entries)) return { ...empty(), ...d, settings: { ...empty().settings, ...d.settings }, version: VERSION };
     } catch (e) { /* 破損 */ }
     return null;
   }
