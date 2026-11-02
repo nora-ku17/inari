@@ -39,7 +39,7 @@
         return { id, text: str(r.text), done: r.done === true, plan: ymOf(r.plan), doneMonth: ymOf(r.doneMonth) };
       case 'shop':
         if (!str(r.name).trim()) return null;
-        return { id, name: str(r.name), price: Math.max(0, num(r.price)), pri: oneOf(r.pri, ['高', '中', '低'], '中'), bought: r.bought === true };
+        return { id, name: str(r.name), price: Math.max(0, num(r.price)), pri: oneOf(r.pri, ['高', '中', '低'], '中'), bought: r.bought === true, plan: ymOf(r.plan), doneMonth: ymOf(r.doneMonth) };
       case 'places': {
         if (!str(r.name).trim()) return null;
         const legacy = typeof r.visited === 'string' && r.visited ? ymOf(r.visited.slice(0, 7)) : '';   // 旧形式(行った日)の引き継ぎ
