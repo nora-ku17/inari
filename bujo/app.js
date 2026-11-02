@@ -95,7 +95,10 @@ function rowHtml(e, opts = {}) {
     <span class="txt">${range ? `<span class="hint">${range}</span> ` : ''}${esc(e.text)}${tagHtml(e)}${e.ref ? ` <span class="tag" style="background:var(--sub)">${REF_LABEL[e.ref.list]}</span>` : ''}</span><span class="acts">${acts.join('')}</span></li>`;
 }
 function listHtml(arr, opts) {
-  const sorted = [...arr].sort((a, b) => (a.type === 'event' ? 0 : 1) - (b.type === 'event' ? 0 : 1) || a.created - b.created);
+  const byDate = opts && opts.byDate;    // 日付順(日付なしは最後)
+  const sorted = [...arr].sort(byDate
+    ? (a, b) => (a.date || '9999').localeCompare(b.date || '9999') || a.created - b.created
+    : (a, b) => (a.type === 'event' ? 0 : 1) - (b.type === 'event' ? 0 : 1) || a.created - b.created);
   return `<ul class="log">${sorted.length ? sorted.map(e => rowHtml(e, opts)).join('') : '<li class="empty">まだ何もありません</li>'}</ul>`;
 }
 function addFormHtml(id, extra = '', ph = '書き出す… (例: o 15時 歯医者 / - メモ / * 大事なタスク)') {
@@ -112,25 +115,42 @@ function viewDaily() {
     ${d !== today() ? '<p><button class="btn" data-act="gotoday">今日へ</button></p>' : ''}
     ${addFormHtml('daily', `<label class="fld">終了日 <input type="date" name="end" min="${d}" title="2日以上のとき"></label>`)}
     <p class="hint">記号: 何も付けない=タスク• / o=予定○ / -=メモ– / *=優先★。左の記号をタップで完了×</p>
+    ${dailyRoutines(d)}
     ${listHtml(items, { migrate: { act: 'tomorrow', label: '>明日' } })}`;
+}
+// ウィークリーのルーティンを、その日のデイリーにも出す(チェックはウィークリーと共通)
+function dailyRoutines(d) {
+  if (!db.routines.length) return '';
+  const w = weekStartOf(d), days = Array.from({ length: 7 }, (_, i) => addDays(w, i));
+  return `<h3>ルーティン</h3><ul class="log">${db.routines.map(r => {
+    const on = r.days.includes(d), n = days.filter(x => r.days.includes(x)).length, g = genreOf(r);
+    return `<li><button class="sym" data-act="rcheck" data-id="${r.id}" data-date="${d}"${g ? ` style="color:${g.color}"` : ''} aria-label="${esc(r.name)}">${on ? '✓' : '□'}</button><span class="txt">${esc(r.name)}</span><span class="hint" style="flex:none;margin:0">今週 ${n}/${r.target}</span></li>`;
+  }).join('')}</ul><h3>今日のこと</h3>`;
 }
 
 // ---- ウィークリー ----
 function toggleRef(e) {
   const src = refSource(e);
   if (!src) return;
-  if (e.ref.list === 'shop') src.bought = !src.bought; else toggleDone(src);
+  if (e.ref.list === 'shop') toggleBought(src); else toggleDone(src);
 }
 const dayOpts = w => `<select name="day" aria-label="曜日"><option value="">曜日は未定</option>${Array.from({ length: 7 }, (_, i) => { const d = addDays(w, i); return `<option value="${d}">${shortDate(d)}(${DOW[i]})</option>`; }).join('')}</select>`;
 
 // 今週に反映できる、まだ終わっていない「やりたい/買いたい/行きたい」
+// マンスリーに入っている(予定月がこの週の月)ものを先に並べる
 function reflectOptions(w) {
   const used = new Set(db.entries.filter(e => e.week === w && e.ref).map(e => e.ref.list + ':' + e.ref.id));
-  const grp = (label, list, arr, name) => {
-    const items = arr.filter(x => !used.has(list + ':' + x.id));
-    return items.length ? `<optgroup label="${label}">${items.map(x => `<option value="${list}:${x.id}">${esc(x[name])}</option>`).join('')}</optgroup>` : '';
-  };
-  return grp('やりたい', 'wishes', db.wishes.filter(x => !x.done), 'text') + grp('買いたい', 'shop', db.shop.filter(x => !x.bought), 'name') + grp('行きたい', 'places', db.places.filter(x => !x.done), 'name');
+  const months = [...new Set([w.slice(0, 7), addDays(w, 6).slice(0, 7)])];
+  const defs = [['やりたい', 'wishes', db.wishes.filter(x => !x.done), 'text'], ['買いたい', 'shop', db.shop.filter(x => !x.bought), 'name'], ['行きたい', 'places', db.places.filter(x => !x.done), 'name']];
+  const opts = (list, arr, name) => arr.map(x => `<option value="${list}:${x.id}">${esc(x[name])}</option>`).join('');
+  let inMonthly = '', others = '';
+  for (const [label, list, arr, name] of defs) {
+    const free = arr.filter(x => !used.has(list + ':' + x.id));
+    const pl = free.filter(x => months.includes(x.plan)), ot = free.filter(x => !months.includes(x.plan));
+    if (pl.length) inMonthly += `<optgroup label="マンスリー:${label}">${opts(list, pl, name)}</optgroup>`;
+    if (ot.length) others += `<optgroup label="ほか:${label}">${opts(list, ot, name)}</optgroup>`;
+  }
+  return inMonthly + others;
 }
 
 function viewWeekly() {
@@ -153,7 +173,7 @@ function viewWeekly() {
     <form class="add" data-form="newroutine" style="margin-top:8px"><input name="t" placeholder="毎週くり返すこと (例: ジムいく)" autocomplete="off" required><select name="target" aria-label="週に何回">${[1, 2, 3, 4, 5, 6, 7].map(n => `<option value="${n}"${n === 3 ? ' selected' : ''}>週${n}回</option>`).join('')}</select>${genreSelect()}<button class="btn primary">追加</button></form>
     <h3>今週やること(その週だけ)</h3>
     ${addFormHtml('weekly', dayOpts(w), '今週やること (例: AI学ぶ / o 15時 打合せ)')}
-    ${opts ? `<form class="add" data-form="reflect"><select name="t" aria-label="リストから選ぶ" required><option value="">やりたい・買いたい・行きたいから選ぶ</option>${opts}</select>${dayOpts(w).replace('name="day"', 'name="day2"')}<button class="btn">今週に反映</button></form>` : ''}
+    ${opts ? `<form class="add" data-form="reflect"><select name="t" aria-label="リストから選ぶ" required><option value="">マンスリーの やりたい・買いたい・行きたい から選ぶ</option>${opts}</select>${dayOpts(w).replace('name="day"', 'name="day2"')}<button class="btn">今週に反映</button></form>` : ''}
     ${listHtml(spot, { migrate: { act: 'nextweek', label: '>来週' } })}
     <h3>日ごとの予定</h3>
     ${others.length ? others.map(x => `<h3 class="dayh" data-act="opendate" data-date="${x.d}" style="margin-top:12px">${shortDate(x.d)}(${DOW[parseYmd(x.d).getDay()]})</h3>${listHtml(x.items)}`).join('') : '<p class="hint">この週に日付のある予定はありません。</p>'}`;
@@ -219,13 +239,19 @@ function viewMonthly() {
 }
 
 // ---- フューチャー(今月から。月数は自分で増やせる) ----
+// ジャンルごとにまとめて、その中を日付順に並べる(ジャンルなしは最後)
+function byGenre(items) {
+  const groups = [...db.genres, null].map(g => ({ g, items: items.filter(e => (g ? e.g === g.id : !genreOf(e))) })).filter(x => x.items.length);
+  if (!groups.length) return listHtml([]);
+  return groups.map(x => `<h4 class="gh" style="color:${x.g ? x.g.color : 'var(--sub)'}">${x.g ? `${x.g.symbol} ${esc(x.g.name)}` : 'ジャンルなし'} <span class="hint">${x.items.length}</span></h4>${listHtml(x.items, { byDate: true })}`).join('');
+}
 function viewFuture() {
   const base = today().slice(0, 7);
   let h = '<h2>フューチャーログ</h2><p class="hint">まだ先の予定・やりたいことを月ごとに置いておく場所。その月になったらマンスリーに出てきます。</p>';
   const count = db.settings.futureCount;
   for (let i = 0; i < count; i++) {
     const m = addMonths(base, i);
-    h += `<div class="card"><h3>${fmtMonth(m)}</h3>${addFormHtml('future:' + m, `<input type="date" name="d" min="${m}-01" max="${m}-${pad(daysIn(m))}" title="日付(任意)" aria-label="日付(任意)" style="max-width:130px;font-size:14px;border:1px solid var(--line);border-radius:8px;background:var(--paper)"><label class="fld">〜 <input type="date" name="end" min="${m}-01" title="終了日(2日以上のとき)" aria-label="終了日(任意)"></label>`)}${listHtml(db.entries.filter(e => e.month === m && (e.planned || !e.date)))}</div>`;
+    h += `<div class="card"><h3>${fmtMonth(m)}</h3>${addFormHtml('future:' + m, `<input type="date" name="d" min="${m}-01" max="${m}-${pad(daysIn(m))}" title="日付(任意)" aria-label="日付(任意)" style="max-width:130px;font-size:14px;border:1px solid var(--line);border-radius:8px;background:var(--paper)"><label class="fld">〜 <input type="date" name="end" min="${m}-01" title="終了日(2日以上のとき)" aria-label="終了日(任意)"></label>`)}${byGenre(db.entries.filter(e => e.month === m && (e.planned || !e.date)))}</div>`;
   }
   const last = addMonths(base, count - 1);
   const lastUsed = db.entries.some(e => e.month === last);
@@ -238,7 +264,7 @@ const yen = n => '¥' + Math.round(n).toLocaleString('ja-JP');
 const delBtn = (list, id) => `<button data-act="rm" data-list="${list}" data-id="${id}">削除</button>`;
 
 const monthField = (list, id, key, val) => `<input type="month" value="${val || ''}" data-set="${list}" data-id="${id}" data-key="${key}" aria-label="${key === 'plan' ? '予定月' : '達成月'}">`;
-const subLine = (list, it) => `<div class="sub"><label>予定月 ${monthField(list, it.id, 'plan', it.plan)}</label><label>達成月 ${monthField(list, it.id, 'doneMonth', it.doneMonth)}</label></div>`;
+const subLine = (list, it) => `<div class="sub"><label>予定月 ${monthField(list, it.id, 'plan', it.plan)}</label><label>${list === 'shop' ? '購入月' : '達成月'} ${monthField(list, it.id, 'doneMonth', it.doneMonth)}</label></div>`;
 
 function viewWishes() {
   const done = db.wishes.filter(w => w.done).length, total = 100;
@@ -254,8 +280,9 @@ function viewShop() {
   const items = [...db.shop].sort((a, b) => a.bought - b.bought || rank[a.pri] - rank[b.pri]);
   const total = db.shop.filter(s => !s.bought).reduce((s, x) => s + x.price, 0);
   return `<h2>買いたいもの</h2><p>未購入の合計: <b>${yen(total)}</b></p>
-    <form class="add" data-form="shop"><input name="t" placeholder="品名" required><input name="p" type="number" min="0" inputmode="numeric" placeholder="金額" style="max-width:90px"><select name="r"><option>高</option><option selected>中</option><option>低</option></select><button class="btn primary">追加</button></form>
-    <ul class="log">${items.length ? items.map(s => `<li class="${s.bought ? 'st-done' : ''}"><button class="sym" data-act="shopdone" data-id="${s.id}">${s.bought ? '×' : '•'}</button><span class="txt">${esc(s.name)} <span class="hint">優先:${s.pri}</span></span><span class="txt" style="flex:none;text-align:right">${yen(s.price)}</span><span class="acts">${delBtn('shop', s.id)}</span></li>`).join('') : '<li class="empty">まだありません</li>'}</ul>`;
+    <form class="add" data-form="shop"><input name="t" placeholder="品名" required><input name="p" type="number" min="0" inputmode="numeric" placeholder="金額" style="max-width:90px"><select name="r"><option>高</option><option selected>中</option><option>低</option></select><label class="fld">予定月 <input type="month" name="plan"></label><button class="btn primary">追加</button></form>
+    <p class="hint">予定月を入れると、その月のマンスリーに出ます。購入済みにすると購入月が入ります。</p>
+    <ul class="log">${items.length ? items.map(s => `<li class="wrap ${s.bought ? 'st-done' : ''}"><button class="sym" data-act="shopdone" data-id="${s.id}">${s.bought ? '×' : '•'}</button><span class="txt">${esc(s.name)} <span class="hint">優先:${s.pri}</span></span><span class="txt" style="flex:none;text-align:right">${yen(s.price)}</span><span class="acts">${delBtn('shop', s.id)}</span>${subLine('shop', s)}</li>`).join('') : '<li class="empty">まだありません</li>'}</ul>`;
 }
 
 function viewPlaces() {
@@ -273,10 +300,11 @@ function viewPlaces() {
 
 // マンスリーに出す: 予定月/達成月がその月のやりたいこと・行きたい場所
 function monthlyPlans(m) {
-  const mk = (title, list, arr, sym0) => `<h3>${title}</h3><ul class="log">${arr.length ? arr.map(x => `<li class="${x.done ? 'st-done' : ''}"><button class="sym" data-act="${list === 'wishes' ? 'wishdone' : 'placedone'}" data-id="${x.id}">${x.done ? '×' : sym0}</button><span class="txt">${esc(x.text || x.name)}${x.pref ? ` <span class="tag" style="background:var(--sub)">${x.pref}</span>` : ''}${x.doneMonth === m ? ' <span class="hint">達成</span>' : ''}</span></li>`).join('') : '<li class="empty">なし</li>'}</ul>`;
+  const mk = (title, list, arr, sym0) => `<h3>${title}</h3><ul class="log">${arr.length ? arr.map(x => `<li class="${x.done || x.bought ? 'st-done' : ''}"><button class="sym" data-act="${{ wishes: 'wishdone', shop: 'shopdone', places: 'placedone' }[list]}" data-id="${x.id}">${x.done || x.bought ? '×' : sym0}</button><span class="txt">${esc(x.text || x.name)}${x.pref ? ` <span class="tag" style="background:var(--sub)">${x.pref}</span>` : ''}${x.doneMonth === m ? ` <span class="hint">${list === 'shop' ? '購入' : '達成'}</span>` : ''}${list === 'shop' && x.price ? ` <span class="hint">${yen(x.price)}</span>` : ''}</span></li>`).join('') : '<li class="empty">なし</li>'}</ul>`;
   const w = db.wishes.filter(x => x.plan === m || x.doneMonth === m);
   const p = db.places.filter(x => x.plan === m || x.doneMonth === m);
-  return mk('今月やりたいこと', 'wishes', w, '•') + mk('今月行きたい場所', 'places', p, '○');
+  const s = db.shop.filter(x => x.plan === m || x.doneMonth === m);
+  return mk('今月やりたいこと', 'wishes', w, '•') + mk('今月買いたいもの', 'shop', s, '•') + mk('今月行きたい場所', 'places', p, '○');
 }
 
 // 総平均法で保有数・平均取得単価・実現損益を計算
@@ -351,6 +379,10 @@ function openReview() {
   if (!dlg.open) dlg.showModal();
 }
 // 完了にしたら達成月を今月に。戻したら達成月を消す
+function toggleBought(s) {
+  s.bought = !s.bought;
+  s.doneMonth = s.bought ? (s.doneMonth || today().slice(0, 7)) : '';
+}
 function toggleDone(x) {
   x.done = !x.done;
   x.doneMonth = x.done ? (x.doneMonth || today().slice(0, 7)) : '';
@@ -473,7 +505,7 @@ document.addEventListener('click', ev => {
       const l = document.createElement('a'); l.href = url; l.download = `bujo-${today()}.json`; l.click(); URL.revokeObjectURL(url); return;
     }
     case 'wishdone': { const w = db.wishes.find(x => x.id === b.dataset.id); if (w) toggleDone(w); break; }
-    case 'shopdone': { const s = db.shop.find(x => x.id === b.dataset.id); if (s) s.bought = !s.bought; break; }
+    case 'shopdone': { const s = db.shop.find(x => x.id === b.dataset.id); if (s) toggleBought(s); break; }
     case 'placedone': { const p = db.places.find(x => x.id === b.dataset.id); if (p) toggleDone(p); break; }
     case 'fadd': db.settings.futureCount += +b.dataset.n; break;
     case 'fsub': db.settings.futureCount = Math.max(1, db.settings.futureCount - 1); break;
@@ -515,7 +547,7 @@ document.addEventListener('submit', ev => {
   } else if (kind === 'wish') {
     if (db.wishes.length < 100) db.wishes.push({ id: uid(), text: raw.trim(), done: false, plan: f.plan.value, doneMonth: '' });
   } else if (kind === 'shop') {
-    db.shop.push({ id: uid(), name: raw.trim(), price: Number(f.p.value) || 0, pri: f.r.value, bought: false });
+    db.shop.push({ id: uid(), name: raw.trim(), price: Number(f.p.value) || 0, pri: f.r.value, bought: false, plan: f.plan.value, doneMonth: '' });
   } else if (kind === 'place') {
     db.places.push({ id: uid(), name: raw.trim(), pref: f.pref.value, memo: f.m.value.trim(), plan: f.plan.value, done: false, doneMonth: '' });
   } else if (kind === 'newroutine') {
@@ -539,7 +571,7 @@ document.addEventListener('change', async ev => {
   const t = ev.target;
   if (t.dataset.set) {                       // やりたい/行きたいの予定月・達成月
     const x = db[t.dataset.set].find(i => i.id === t.dataset.id);
-    if (x) { x[t.dataset.key] = t.value; if (t.dataset.key === 'doneMonth') x.done = !!t.value; save(); render(); }
+    if (x) { x[t.dataset.key] = t.value; if (t.dataset.key === 'doneMonth') { if (t.dataset.set === 'shop') x.bought = !!t.value; else x.done = !!t.value; } save(); render(); }
     return;
   }
   if (t.dataset.gset) {                      // ジャンルの名前・色・記号
