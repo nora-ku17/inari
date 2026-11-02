@@ -26,7 +26,7 @@ ul.log .empty{color:var(--sub);font-size:14px}
 .st-migrated .txt,.st-scheduled .txt,.st-cancelled .txt{color:var(--sub)}
 .st-cancelled .txt{text-decoration:line-through}
 .pri .txt::before{content:"★ ";color:var(--accent)}
-.acts{display:flex;gap:2px;flex:none}
+.acts{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:2px;flex:none;max-width:55%}
 .acts button{border:0;background:none;color:var(--sub);font-size:12px;padding:4px 6px;cursor:pointer;border-radius:6px}
 .acts button:hover{background:var(--line)}
 .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:8px}
