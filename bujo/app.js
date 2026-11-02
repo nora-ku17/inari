@@ -242,7 +242,7 @@ function viewTrades() {
     <h3>銘柄ごと</h3>
     <ul class="log">${codes.length ? codes.map(c => { const s = sum[c]; return `<li><span class="txt">${esc(c)}<br><span class="hint">保有 ${s.qty}株${s.qty ? ` / 平均 ${yen(s.cost / s.qty)}` : ''}</span></span><span class="txt" style="flex:none;text-align:right;color:${s.pnl >= 0 ? 'var(--ok)' : 'var(--accent)'}">${s.pnl >= 0 ? '+' : ''}${yen(s.pnl)}</span></li>`; }).join('') : '<li class="empty">まだありません</li>'}</ul>
     <h3>売買履歴</h3>
-    <ul class="log">${trades.length ? trades.map(t => `<li><span class="sym">${t.side === 'buy' ? '買' : '売'}</span><span class="txt">${esc(t.code)} ${t.qty}株 @${yen(t.price)}<br><span class="hint">${t.date}${t.memo ? ' ' + esc(t.memo) : ''}</span></span><span class="acts">${delBtn('trades', t.id)}</span></li>`).join('') : '<li class="empty">まだありません</li>'}</ul>`;
+    <ul class="log">${trades.length ? trades.map(t => `<li><span class="sym">${t.side === 'buy' ? '買' : '売'}</span><span class="txt">${esc(t.code)} ${t.qty}株 @${yen(t.price)}<br><span class="hint">${t.date}${t.memo ? ' ' + esc(t.memo) : ''}</span></span><span class="acts"><button data-act="edittrade" data-id="${t.id}">編集</button>${delBtn('trades', t.id)}</span></li>`).join('') : '<li class="empty">まだありません</li>'}</ul>`;
 }
 
 // ---- 使い方 ----
@@ -305,6 +305,30 @@ function openEdit(id) {
   </form>`;
   if (!dlg.open) dlg.showModal();
 }
+function openTradeEdit(id) {
+  const t = db.trades.find(x => x.id === id), dlg = $('#edit-dialog');
+  if (!t) return;
+  dlg.innerHTML = `<form data-form="edittrade:${t.id}" class="sync-form">
+    <h2>株の記録を編集</h2>
+    <label class="field"><span class="lbl">銘柄</span><input name="c" value="${esc(t.code)}" required></label>
+    <label class="field"><span class="lbl">売買</span><select name="s"><option value="buy"${t.side === 'buy' ? ' selected' : ''}>買い</option><option value="sell"${t.side === 'sell' ? ' selected' : ''}>売り</option></select></label>
+    <label class="field"><span class="lbl">日付</span><input type="date" name="d" value="${t.date}" required></label>
+    <label class="field"><span class="lbl">数量(株)</span><input type="number" name="q" min="1" inputmode="numeric" value="${t.qty}" required></label>
+    <label class="field"><span class="lbl">単価(円)</span><input type="number" name="p" min="0" step="any" inputmode="decimal" value="${t.price}" required></label>
+    <label class="field"><span class="lbl">理由・メモ</span><input name="m" value="${esc(t.memo || '')}"></label>
+    <div class="btn-row"><button class="btn primary">保存</button><button type="button" class="btn" data-act="edit-close">キャンセル</button></div>
+  </form>`;
+  if (!dlg.open) dlg.showModal();
+}
+function saveTradeEdit(f, id) {
+  const t = db.trades.find(x => x.id === id);
+  if (!t) return;
+  const code = f.c.value.trim(), qty = Number(f.q.value), price = Number(f.p.value);
+  if (!code || !f.d.value || !(qty >= 1) || !(price >= 0)) { toast('銘柄・日付・数量・単価を確認してください'); return; }
+  Object.assign(t, { code, side: f.s.value, date: f.d.value, qty, price, memo: f.m.value.trim() });
+  $('#edit-dialog').close();
+  save(); render();
+}
 function saveEdit(f, id) {
   const e = find(id);
   if (!e) return;
@@ -362,6 +386,7 @@ document.addEventListener('click', ev => {
     case 'cancel': if (e) e.status = 'cancelled'; break;
     case 'del': db.entries = db.entries.filter(x => x.id !== b.dataset.id); break;
     case 'edit': openEdit(b.dataset.id); return;
+    case 'edittrade': openTradeEdit(b.dataset.id); return;
     case 'edit-close': $('#edit-dialog').close(); return;
     case 'review': openReview(); return;
     case 'close-dlg': $('#migrate-dialog').close(); render(); return;
@@ -394,6 +419,7 @@ document.addEventListener('submit', ev => {
   if (!raw.trim()) return;
   const [kind, arg] = f.dataset.form.split(':');
   if (kind === 'edit') { saveEdit(f, arg); return; }
+  if (kind === 'edittrade') { saveTradeEdit(f, arg); return; }
   const g = f.elements.g ? f.elements.g.value : '';
   if (kind === 'daily') {
     const p = parseRapid(raw, 'task'); const end = f.elements.end ? f.elements.end.value : '';
