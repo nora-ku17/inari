@@ -26,8 +26,9 @@
       case 'entries': {
         const type = oneOf(r.type, ['task', 'event', 'note'], null);
         if (!type || !str(r.text).trim()) return null;
+        const date = ymdOf(r.date), endDate = ymdOf(r.endDate);
         return { id, type, status: oneOf(r.status, ['open', 'done', 'migrated', 'scheduled', 'cancelled'], 'open'), text: str(r.text),
-          priority: r.priority === true, date: ymdOf(r.date), month: ymOf(r.month) || null, created: num(r.created),
+          priority: r.priority === true, date, endDate: date && endDate && endDate > date ? endDate : null, month: ymOf(r.month) || null, created: num(r.created),
           g: typeof r.g === 'string' && ID_RE.test(r.g) ? r.g : '', planned: r.planned === true };
       }
       case 'wishes':

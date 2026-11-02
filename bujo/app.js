@@ -48,6 +48,10 @@ function parseRapid(raw, defType) {
   }
   return { type, priority, text: t.trim() };
 }
+// 予定が、その日にかかっているか(開始日〜終了日)
+const covers = (e, ds) => !!e.date && e.date <= ds && ds <= (e.endDate || e.date);
+const shortDate = s => `${Number(s.slice(5, 7))}/${Number(s.slice(8))}`;
+const rangeLabel = e => (e.endDate ? `${shortDate(e.date)}〜${shortDate(e.endDate)}` : e.planned && e.date ? shortDate(e.date) : '');
 const genreOf = e => e.g && db.genres.find(g => g.id === e.g);
 const genreSelect = (name = 'g', cur = '') => `<select name="${name}" aria-label="ジャンル"><option value="">ジャンルなし</option>${db.genres.map(g => `<option value="${g.id}"${g.id === cur ? ' selected' : ''}>${g.symbol} ${esc(g.name)}</option>`).join('')}</select>`;
 const prefOptions = cur => `<option value="">県を選ぶ</option>${PREFS.concat(ABROAD).map(p => `<option${p === cur ? ' selected' : ''}>${p}</option>`).join('')}`;
@@ -73,10 +77,12 @@ function rowHtml(e, opts = {}) {
     acts.push(`<button data-act="future" data-id="${e.id}" title="未来へ">&lt;未来</button>`);
   }
   if (!closed) acts.push(`<button data-act="cancel" data-id="${e.id}" title="不要になった">取消</button>`);
+  acts.push(`<button data-act="edit" data-id="${e.id}">編集</button>`);
   acts.push(`<button data-act="del" data-id="${e.id}" title="削除">削除</button>`);
+  const range = rangeLabel(e);
   return `<li class="st-${e.status}${e.priority ? ' pri' : ''}">
     <button class="sym" data-act="toggle" data-id="${e.id}" aria-label="完了切替"${symStyle(e)}>${entrySym(e)}</button>
-    <span class="txt">${e.planned && e.date ? `<span class="hint">${Number(e.date.slice(5, 7))}/${Number(e.date.slice(8))}</span> ` : ''}${esc(e.text)}${tagHtml(e)}</span><span class="acts">${acts.join('')}</span></li>`;
+    <span class="txt">${range ? `<span class="hint">${range}</span> ` : ''}${esc(e.text)}${tagHtml(e)}</span><span class="acts">${acts.join('')}</span></li>`;
 }
 function listHtml(arr, opts) {
   const sorted = [...arr].sort((a, b) => (a.type === 'event' ? 0 : 1) - (b.type === 'event' ? 0 : 1) || a.created - b.created);
@@ -89,12 +95,12 @@ function addFormHtml(id, extra = '') {
 // ---- デイリー ----
 function viewDaily() {
   const d = state.date;
-  const items = db.entries.filter(e => e.date === d);
+  const items = db.entries.filter(e => covers(e, d));
   return `<div class="nav"><button data-act="day" data-n="-1">‹</button>
     <h2>${fmtDate(d)}${d === today() ? ' · 今日' : ''}</h2>
     <button data-act="day" data-n="1">›</button></div>
     ${d !== today() ? '<p><button class="btn" data-act="gotoday">今日へ</button></p>' : ''}
-    ${addFormHtml('daily')}
+    ${addFormHtml('daily', `<label class="fld">終了日 <input type="date" name="end" min="${d}" title="2日以上のとき"></label>`)}
     <p class="hint">記号: 何も付けない=タスク• / o=予定○ / -=メモ– / *=優先★。左の記号をタップで完了×</p>
     ${listHtml(items, { migrate: { act: 'tomorrow', label: '>明日' } })}`;
 }
@@ -115,20 +121,29 @@ function dayMarks(on) {
   if (!groups.size) return '';
   return `<span class="mk">${[...groups.values()].map(x => `<b${x.color ? ` style="color:${x.color}"` : ''}>${x.sym}<small>${x.n}</small></b>`).join('')}</span>`;
 }
+// マンスリー一覧の日付表示(例: 5日 / 5〜7日 / 30日〜11/2)
+function eventDays(e, m) {
+  const day = s => Number(s.slice(8));
+  if (!e.endDate) return `${day(e.date)}日`;
+  const sameStart = e.date.startsWith(m);
+  if (e.endDate.startsWith(e.date.slice(0, 7))) return `${day(e.date)}〜${day(e.endDate)}日`;
+  return sameStart ? `${day(e.date)}日〜${shortDate(e.endDate)}` : `${shortDate(e.date)}〜${day(e.endDate)}日`;
+}
 function viewMonthly() {
   const m = state.month, first = parseYmd(m + '-01').getDay(), n = daysIn(m);
   let cells = DOW.map(x => `<div class="dow">${x}</div>`).join('') + '<div class="d blank"></div>'.repeat(first);
   for (let i = 1; i <= n; i++) {
     const ds = `${m}-${pad(i)}`;
-    const on = db.entries.filter(e => e.date === ds);
+    const on = db.entries.filter(e => covers(e, ds));
     cells += `<button class="d${ds === today() ? ' today' : ''}" data-act="opendate" data-date="${ds}">${i}${dayMarks(on)}</button>`;
   }
   const monthly = db.entries.filter(e => e.month === m && !e.date);
-  const events = db.entries.filter(e => e.date && e.date.startsWith(m) && (e.type === 'event' || e.planned)).sort((a, b) => a.date.localeCompare(b.date));
+  const mStart = m + '-01', mEnd = `${m}-${pad(n)}`;
+  const events = db.entries.filter(e => e.date && e.date <= mEnd && (e.endDate || e.date) >= mStart && (e.type === 'event' || e.planned)).sort((a, b) => a.date.localeCompare(b.date));
   return `<div class="nav"><button data-act="mon" data-n="-1">‹</button><h2>${fmtMonth(m)}</h2><button data-act="mon" data-n="1">›</button></div>
     <div class="cal">${cells}</div>
     <h3>今月の予定</h3>
-    <ul class="log">${events.length ? events.map(e => `<li class="st-${e.status}"><span class="sym"${symStyle(e)}>${entrySym(e)}</span><span class="txt">${parseYmd(e.date).getDate()}日 ${esc(e.text)}${tagHtml(e)}</span></li>`).join('') : '<li class="empty">予定なし</li>'}</ul>
+    <ul class="log">${events.length ? events.map(e => `<li class="st-${e.status}"><span class="sym"${symStyle(e)}>${entrySym(e)}</span><span class="txt">${eventDays(e, m)} ${esc(e.text)}${tagHtml(e)}</span><span class="acts"><button data-act="edit" data-id="${e.id}">編集</button></span></li>`).join('') : '<li class="empty">予定なし</li>'}</ul>
     ${monthlyPlans(m)}
     <h3>今月のタスク</h3>
     ${addFormHtml('monthly')}
@@ -143,7 +158,7 @@ function viewFuture() {
   const count = db.settings.futureCount;
   for (let i = 0; i < count; i++) {
     const m = addMonths(base, i);
-    h += `<div class="card"><h3>${fmtMonth(m)}</h3>${addFormHtml('future:' + m, `<input type="date" name="d" min="${m}-01" max="${m}-${pad(daysIn(m))}" title="日付(任意)" aria-label="日付(任意)" style="max-width:130px;font-size:14px;border:1px solid var(--line);border-radius:8px;background:var(--paper)">`)}${listHtml(db.entries.filter(e => e.month === m && (e.planned || !e.date)))}</div>`;
+    h += `<div class="card"><h3>${fmtMonth(m)}</h3>${addFormHtml('future:' + m, `<input type="date" name="d" min="${m}-01" max="${m}-${pad(daysIn(m))}" title="日付(任意)" aria-label="日付(任意)" style="max-width:130px;font-size:14px;border:1px solid var(--line);border-radius:8px;background:var(--paper)"><label class="fld">〜 <input type="date" name="end" min="${m}-01" title="終了日(2日以上のとき)" aria-label="終了日(任意)"></label>`)}${listHtml(db.entries.filter(e => e.month === m && (e.planned || !e.date)))}</div>`;
   }
   const last = addMonths(base, count - 1);
   const lastUsed = db.entries.some(e => e.month === last);
@@ -273,6 +288,43 @@ function toggleDone(x) {
   x.done = !x.done;
   x.doneMonth = x.done ? (x.doneMonth || today().slice(0, 7)) : '';
 }
+// ---- 予定・タスクの編集 ----
+function openEdit(id) {
+  const e = find(id), dlg = $('#edit-dialog');
+  if (!e) return;
+  dlg.innerHTML = `<form data-form="edit:${e.id}" class="sync-form">
+    <h2>編集</h2>
+    <label class="field"><span class="lbl">内容</span><input name="t" value="${esc(e.text)}" required></label>
+    <label class="field"><span class="lbl">種類</span><select name="type">${[['event', '予定 ○'], ['task', 'タスク •'], ['note', 'メモ –']].map(([v, l]) => `<option value="${v}"${v === e.type ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
+    <label class="field"><span class="lbl">ジャンル</span>${genreSelect('g', e.g || '')}</label>
+    <label class="field"><span class="lbl">開始日(日付がある予定)</span><input type="date" name="d" value="${e.date || ''}"></label>
+    <label class="field"><span class="lbl">終了日(2日以上のとき)</span><input type="date" name="end" value="${e.endDate || ''}"></label>
+    <label class="field"><span class="lbl">月(日付を入れないとき)</span><input type="month" name="month" value="${e.month || (e.date || '').slice(0, 7)}"></label>
+    <label class="fld"><input type="checkbox" name="pri"${e.priority ? ' checked' : ''}> 優先 ★</label>
+    <div class="btn-row"><button class="btn primary">保存</button><button type="button" class="btn" data-act="edit-close">キャンセル</button></div>
+  </form>`;
+  if (!dlg.open) dlg.showModal();
+}
+function saveEdit(f, id) {
+  const e = find(id);
+  if (!e) return;
+  const d = f.d.value, end = f.end.value, month = f.month.value, text = f.t.value.trim();
+  if (!text) return;
+  if (end && !d) { toast('終了日を入れるときは、開始日も入れてください'); return; }
+  if (end && end < d) { toast('終了日は開始日より後にしてください'); return; }
+  if (!d && !month) { toast('開始日か月のどちらかを入れてください'); return; }
+  e.text = text; e.type = f.type.value; e.g = f.g.value; e.priority = f.pri.checked;
+  if (e.type !== 'task' && e.status === 'done') e.status = 'open';
+  if (d) {
+    const wasPlain = e.date && !e.month && !e.planned;       // デイリーで入れた予定は、そのまま
+    e.date = d; e.endDate = end > d ? end : null;
+    if (!wasPlain) { e.planned = true; e.month = d.slice(0, 7); }
+  } else {
+    e.month = month; e.date = null; e.endDate = null; e.planned = false;
+  }
+  $('#edit-dialog').close();
+  save(); render();
+}
 function migrateTo(e, fields, status) {
   addEntry({ type: 'task', text: e.text, priority: e.priority, g: e.g || '', ...fields });
   e.status = status;
@@ -309,6 +361,8 @@ document.addEventListener('click', ev => {
     case 'future': if (e) migrateTo(e, { month: futureMonth(e) }, 'scheduled'); break;
     case 'cancel': if (e) e.status = 'cancelled'; break;
     case 'del': db.entries = db.entries.filter(x => x.id !== b.dataset.id); break;
+    case 'edit': openEdit(b.dataset.id); return;
+    case 'edit-close': $('#edit-dialog').close(); return;
     case 'review': openReview(); return;
     case 'close-dlg': $('#migrate-dialog').close(); render(); return;
     case 'mig-next': if (e) migrateTo(e, { month: $('#migrate-dialog').dataset.next }, 'migrated'); save(); openReview(); return;
@@ -339,14 +393,20 @@ document.addEventListener('submit', ev => {
   const raw = f.elements.t ? f.elements.t.value : f.elements.c.value;
   if (!raw.trim()) return;
   const [kind, arg] = f.dataset.form.split(':');
+  if (kind === 'edit') { saveEdit(f, arg); return; }
   const g = f.elements.g ? f.elements.g.value : '';
   if (kind === 'daily') {
-    const p = parseRapid(raw, 'task'); if (p.text) addEntry({ ...p, g, date: state.date });
+    const p = parseRapid(raw, 'task'); const end = f.elements.end ? f.elements.end.value : '';
+    if (end && end < state.date) { toast('終了日は開始日より後にしてください'); return; }
+    if (p.text) addEntry({ ...p, g, date: state.date, endDate: end > state.date ? end : null });
   } else if (kind === 'monthly') {
     const p = parseRapid(raw, 'task'); if (p.text) addEntry({ ...p, g, month: state.month });
   } else if (kind === 'future') {
     const p = parseRapid(raw, 'task'); const d = f.elements.d && f.elements.d.value;
-    if (p.text) addEntry(d ? { ...p, g, month: d.slice(0, 7), date: d, planned: true } : { ...p, g, month: arg });
+    const end = f.elements.end ? f.elements.end.value : '';
+    if (end && !d) { toast('終了日を入れるときは、日付も選んでください'); return; }
+    if (end && end < d) { toast('終了日は開始日より後にしてください'); return; }
+    if (p.text) addEntry(d ? { ...p, g, month: d.slice(0, 7), date: d, endDate: end > d ? end : null, planned: true } : { ...p, g, month: arg });
   } else if (kind === 'wish') {
     if (db.wishes.length < 100) db.wishes.push({ id: uid(), text: raw.trim(), done: false, plan: f.plan.value, doneMonth: '' });
   } else if (kind === 'shop') {
