@@ -16,6 +16,8 @@
   const num = v => (typeof v === 'number' && isFinite(v) ? v : 0);
   const ymdOf = v => (typeof v === 'string' && YMD_RE.test(v) ? v : null);
   const ymOf = v => (typeof v === 'string' && YM_RE.test(v) ? v : '');
+  // 「やりたい/買いたい/行きたい」から今週に反映した項目の、元の項目への参照
+  const refOf = v => (v && typeof v === 'object' && ['wishes', 'shop', 'places'].includes(v.list) && typeof v.id === 'string' && ID_RE.test(v.id) ? { list: v.list, id: v.id } : null);
   const oneOf = (v, list, d) => (list.includes(v) ? v : d);
 
   function normRecord(name, r) {
@@ -29,7 +31,8 @@
         const date = ymdOf(r.date), endDate = ymdOf(r.endDate);
         return { id, type, status: oneOf(r.status, ['open', 'done', 'migrated', 'scheduled', 'cancelled'], 'open'), text: str(r.text),
           priority: r.priority === true, date, endDate: date && endDate && endDate > date ? endDate : null, month: ymOf(r.month) || null, created: num(r.created),
-          g: typeof r.g === 'string' && ID_RE.test(r.g) ? r.g : '', planned: r.planned === true };
+          g: typeof r.g === 'string' && ID_RE.test(r.g) ? r.g : '', planned: r.planned === true,
+          week: ymdOf(r.week), ref: refOf(r.ref) };
       }
       case 'wishes':
         if (!str(r.text).trim()) return null;
@@ -48,6 +51,11 @@
         if (!date || !str(r.code).trim()) return null;
         return { id, code: str(r.code, 100), side: oneOf(r.side, ['buy', 'sell'], 'buy'), date, qty: num(r.qty), price: Math.max(0, num(r.price)), memo: str(r.memo), created: num(r.created) };
       }
+      case 'routines': {
+        if (!str(r.name, 100).trim()) return null;
+        const days = Array.isArray(r.days) ? [...new Set(r.days.filter(x => typeof x === 'string' && YMD_RE.test(x)))].sort().slice(-800) : [];
+        return { id, name: str(r.name, 100), target: Math.min(7, Math.max(1, Math.round(num(r.target)) || 3)), g: typeof r.g === 'string' && ID_RE.test(r.g) ? r.g : '', days };
+      }
       case 'genres':
         if (!str(r.name, 50).trim()) return null;
         return { id, name: str(r.name, 50), color: typeof r.color === 'string' && COLOR_RE.test(r.color) ? r.color : '#888888', symbol: oneOf(r.symbol, SYMBOLS, '●') };
@@ -57,13 +65,13 @@
   const clampMonths = v => Math.min(120, Math.max(1, Math.round(num(v)) || 6));
   function sanitizeDb(d) {
     const out = { ...d };
-    for (const k of ['entries', 'wishes', 'shop', 'places', 'trades']) out[k] = Array.isArray(d[k]) ? d[k].map(r => normRecord(k, r)).filter(Boolean) : [];
+    for (const k of ['entries', 'wishes', 'shop', 'places', 'trades', 'routines']) out[k] = Array.isArray(d[k]) ? d[k].map(r => normRecord(k, r)).filter(Boolean) : [];
     out.genres = Array.isArray(d.genres) ? d.genres.map(r => normRecord('genres', r)).filter(Boolean) : empty().genres;
     out.settings = { futureCount: clampMonths(d.settings && d.settings.futureCount) };
     return out;
   }
   const VERSION = 1;
-  const empty = () => ({ version: VERSION, entries: [], wishes: [], shop: [], places: [], trades: [],
+  const empty = () => ({ version: VERSION, entries: [], wishes: [], shop: [], places: [], trades: [], routines: [],
     settings: { futureCount: 6 },
     genres: [
       { id: 'g1', name: '仕事', color: '#3b6ea8', symbol: '■' },

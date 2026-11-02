@@ -6,7 +6,7 @@
    - 項目を1件ずつ別ドキュメントとして保存するので、別々の端末で別々の項目を
      追加・編集しても上書きし合いません(同じ項目を同時に編集したときは後の書き込みが勝ちます)。
    - オフライン中の変更は端末に残り、つながったときに送信されます。
-   - 保存先: users/{uid}/{entries|wishes|shop|places|trades|genres|config}/{id}
+   - 保存先: users/{uid}/{entries|wishes|shop|places|trades|routines|genres|config}/{id}
      ルールは自分(uid)のデータだけ、メール確認済みのアカウントだけ読み書き可(kazoku/firestore.rules)。
    - 受け取ったデータは BujoStorage.normRecord で必ず検査してから使います。
    ========================================================= */
@@ -24,6 +24,7 @@ const Sync = (() => {
     shop: { get: () => App().getDb().shop, set: a => { App().getDb().shop = a; } },
     places: { get: () => App().getDb().places, set: a => { App().getDb().places = a; } },
     trades: { get: () => App().getDb().trades, set: a => { App().getDb().trades = a; } },
+    routines: { get: () => App().getDb().routines, set: a => { App().getDb().routines = a; }, ordered: true },
     genres: { get: () => App().getDb().genres, set: a => { App().getDb().genres = a; }, ordered: true },
     config: {
       get: () => [{ id: 'shared', futureCount: App().getDb().settings.futureCount }],
@@ -203,7 +204,11 @@ const Sync = (() => {
         }
         applyChanges(name, snap.docChanges());
         updateBadge();
-      }, err => onError(err)));
+      }, err => {
+        // 1つの種類だけ読めなくても(ルール未更新など)、ほかのデータの同期は止めない
+        if (!firstDone.has(name)) { firstDone.add(name); if (firstDone.size === names.length) onReady(); }
+        onError(err);
+      }));
     }
   }
 
@@ -244,7 +249,7 @@ const Sync = (() => {
   function onError(err) {
     console.error(err);
     lastError = err && err.code === 'permission-denied'
-      ? 'データを読み書きする権限がありません(Firestoreのルールにバレットジャーナル用の設定が入っているか確認してください)'
+      ? 'データを読み書きする権限がありません(Firestoreのルールを最新のもの(kazoku/firestore.rules)に更新してください)'
       : `同期でエラーが起きました(${(err && err.code) || err})`;
     updateBadge();
     if (onSettings()) scheduleRender();

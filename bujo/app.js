@@ -9,7 +9,7 @@ const ABROAD = BujoStorage.ABROAD;
 const GENRE_COLORS = ['#3b6ea8', '#d9822b', '#4a7c59', '#8e5ba8', '#c0562b', '#b8962e', '#2f8f9d', '#c2517a'];
 
 let db = BujoStorage.empty();
-let state = { tab: 'daily', date: today(), month: today().slice(0, 7) };
+let state = { tab: 'daily', date: today(), month: today().slice(0, 7), week: weekStartOf(today()) };
 
 function save() { BujoStorage.save(db); if (window.Sync) Sync.schedulePush(); }
 let toastTimer;
@@ -49,9 +49,18 @@ function parseRapid(raw, defType) {
   return { type, priority, text: t.trim() };
 }
 // 予定が、その日にかかっているか(開始日〜終了日)
+// 週の始まり(日曜)。マンスリーのカレンダーと同じ並びにそろえる
+function weekStartOf(ds) { return addDays(ds, -parseYmd(ds).getDay()); }
+const REF_LABEL = { wishes: 'やりたい', shop: '買いたい', places: '行きたい' };
+const refSource = e => e.ref && db[e.ref.list] && db[e.ref.list].find(x => x.id === e.ref.id);
+// 「やりたい/買いたい/行きたい」から反映した項目は、元の項目の完了状態に合わせて表示する
+function withRef(e) {
+  const src = refSource(e);
+  return src && (e.status === 'open' || e.status === 'done') ? { ...e, status: (src.done || src.bought) ? 'done' : 'open' } : e;
+}
 const covers = (e, ds) => !!e.date && e.date <= ds && ds <= (e.endDate || e.date);
 const shortDate = s => `${Number(s.slice(5, 7))}/${Number(s.slice(8))}`;
-const rangeLabel = e => (e.endDate ? `${shortDate(e.date)}〜${shortDate(e.endDate)}` : e.planned && e.date ? shortDate(e.date) : '');
+const rangeLabel = e => (e.endDate ? `${shortDate(e.date)}〜${shortDate(e.endDate)}` : (e.planned || e.week) && e.date ? shortDate(e.date) : '');
 const genreOf = e => e.g && db.genres.find(g => g.id === e.g);
 const genreSelect = (name = 'g', cur = '') => `<select name="${name}" aria-label="ジャンル"><option value="">ジャンルなし</option>${db.genres.map(g => `<option value="${g.id}"${g.id === cur ? ' selected' : ''}>${g.symbol} ${esc(g.name)}</option>`).join('')}</select>`;
 const prefOptions = cur => `<option value="">県を選ぶ</option>${PREFS.concat(ABROAD).map(p => `<option${p === cur ? ' selected' : ''}>${p}</option>`).join('')}`;
@@ -70,6 +79,7 @@ const find = id => db.entries.find(e => e.id === id);
 
 // ---- 共通: 1行の描画 ----
 function rowHtml(e, opts = {}) {
+  e = withRef(e);
   const closed = e.status !== 'open';
   const acts = [];
   if (e.type === 'task' && !closed) {
@@ -82,14 +92,14 @@ function rowHtml(e, opts = {}) {
   const range = rangeLabel(e);
   return `<li class="st-${e.status}${e.priority ? ' pri' : ''}">
     <button class="sym" data-act="toggle" data-id="${e.id}" aria-label="完了切替"${symStyle(e)}>${entrySym(e)}</button>
-    <span class="txt">${range ? `<span class="hint">${range}</span> ` : ''}${esc(e.text)}${tagHtml(e)}</span><span class="acts">${acts.join('')}</span></li>`;
+    <span class="txt">${range ? `<span class="hint">${range}</span> ` : ''}${esc(e.text)}${tagHtml(e)}${e.ref ? ` <span class="tag" style="background:var(--sub)">${REF_LABEL[e.ref.list]}</span>` : ''}</span><span class="acts">${acts.join('')}</span></li>`;
 }
 function listHtml(arr, opts) {
   const sorted = [...arr].sort((a, b) => (a.type === 'event' ? 0 : 1) - (b.type === 'event' ? 0 : 1) || a.created - b.created);
   return `<ul class="log">${sorted.length ? sorted.map(e => rowHtml(e, opts)).join('') : '<li class="empty">まだ何もありません</li>'}</ul>`;
 }
-function addFormHtml(id, extra = '') {
-  return `<form class="add" data-form="${id}"><input name="t" placeholder="書き出す… (例: o 15時 歯医者 / - メモ / * 大事なタスク)" autocomplete="off" required>${extra}${genreSelect()}<button class="btn primary">追加</button></form>`;
+function addFormHtml(id, extra = '', ph = '書き出す… (例: o 15時 歯医者 / - メモ / * 大事なタスク)') {
+  return `<form class="add" data-form="${id}"><input name="t" placeholder="${ph}" autocomplete="off" required>${extra}${genreSelect()}<button class="btn primary">追加</button></form>`;
 }
 
 // ---- デイリー ----
@@ -103,6 +113,63 @@ function viewDaily() {
     ${addFormHtml('daily', `<label class="fld">終了日 <input type="date" name="end" min="${d}" title="2日以上のとき"></label>`)}
     <p class="hint">記号: 何も付けない=タスク• / o=予定○ / -=メモ– / *=優先★。左の記号をタップで完了×</p>
     ${listHtml(items, { migrate: { act: 'tomorrow', label: '>明日' } })}`;
+}
+
+// ---- ウィークリー ----
+function toggleRef(e) {
+  const src = refSource(e);
+  if (!src) return;
+  if (e.ref.list === 'shop') src.bought = !src.bought; else toggleDone(src);
+}
+const dayOpts = w => `<select name="day" aria-label="曜日"><option value="">曜日は未定</option>${Array.from({ length: 7 }, (_, i) => { const d = addDays(w, i); return `<option value="${d}">${shortDate(d)}(${DOW[i]})</option>`; }).join('')}</select>`;
+
+// 今週に反映できる、まだ終わっていない「やりたい/買いたい/行きたい」
+function reflectOptions(w) {
+  const used = new Set(db.entries.filter(e => e.week === w && e.ref).map(e => e.ref.list + ':' + e.ref.id));
+  const grp = (label, list, arr, name) => {
+    const items = arr.filter(x => !used.has(list + ':' + x.id));
+    return items.length ? `<optgroup label="${label}">${items.map(x => `<option value="${list}:${x.id}">${esc(x[name])}</option>`).join('')}</optgroup>` : '';
+  };
+  return grp('やりたい', 'wishes', db.wishes.filter(x => !x.done), 'text') + grp('買いたい', 'shop', db.shop.filter(x => !x.bought), 'name') + grp('行きたい', 'places', db.places.filter(x => !x.done), 'name');
+}
+
+function viewWeekly() {
+  const w = state.week, days = Array.from({ length: 7 }, (_, i) => addDays(w, i));
+  const cur = weekStartOf(today());
+  const grid = db.routines.length ? `<table class="rgrid"><tr><th></th>${days.map(d => `<th class="${d === today() ? 'today' : ''}">${DOW[parseYmd(d).getDay()]}<br>${Number(d.slice(8))}</th>`).join('')}<th></th></tr>${db.routines.map(r => {
+    const n = days.filter(d => r.days.includes(d)).length, g = genreOf(r);
+    return `<tr><td class="name"><button class="link-btn" data-act="redit" data-id="${r.id}">${g ? `<span style="color:${g.color}">●</span> ` : ''}${esc(r.name)}</button></td>${days.map(d => {
+      const on = r.days.includes(d);
+      return `<td><button class="cell${on ? ' on' : ''}" data-act="rcheck" data-id="${r.id}" data-date="${d}" aria-label="${esc(r.name)} ${shortDate(d)}">${on ? '✓' : ''}</button></td>`;
+    }).join('')}<td class="cnt${n >= r.target ? ' ok' : ''}">${n}/${r.target}</td></tr>`;
+  }).join('')}</table>` : '<p class="hint">毎週くり返すこと(ジムに行く、など)を、下の欄に追加すると、ここで曜日ごとにチェックできます。</p>';
+  const spot = db.entries.filter(e => e.week === w).sort((a, b) => (a.date || '9').localeCompare(b.date || '9') || a.created - b.created);
+  const others = days.map(d => ({ d, items: db.entries.filter(e => covers(e, d) && e.week !== w) })).filter(x => x.items.length);
+  const opts = reflectOptions(w);
+  return `<div class="nav"><button data-act="wk" data-n="-7">‹</button><h2>${shortDate(w)}〜${shortDate(days[6])}${w === cur ? ' · 今週' : ''}</h2><button data-act="wk" data-n="7">›</button></div>
+    ${w !== cur ? '<p><button class="btn" data-act="wkcur">今週へ</button></p>' : ''}
+    <h3>毎週のルーティン</h3>
+    ${grid}
+    <form class="add" data-form="newroutine" style="margin-top:8px"><input name="t" placeholder="毎週くり返すこと (例: ジムいく)" autocomplete="off" required><select name="target" aria-label="週に何回">${[1, 2, 3, 4, 5, 6, 7].map(n => `<option value="${n}"${n === 3 ? ' selected' : ''}>週${n}回</option>`).join('')}</select>${genreSelect()}<button class="btn primary">追加</button></form>
+    <h3>今週やること(その週だけ)</h3>
+    ${addFormHtml('weekly', dayOpts(w), '今週やること (例: AI学ぶ / o 15時 打合せ)')}
+    ${opts ? `<form class="add" data-form="reflect"><select name="t" aria-label="リストから選ぶ" required><option value="">やりたい・買いたい・行きたいから選ぶ</option>${opts}</select>${dayOpts(w).replace('name="day"', 'name="day2"')}<button class="btn">今週に反映</button></form>` : ''}
+    ${listHtml(spot, { migrate: { act: 'nextweek', label: '>来週' } })}
+    <h3>日ごとの予定</h3>
+    ${others.length ? others.map(x => `<h3 class="dayh" data-act="opendate" data-date="${x.d}" style="margin-top:12px">${shortDate(x.d)}(${DOW[parseYmd(x.d).getDay()]})</h3>${listHtml(x.items)}`).join('') : '<p class="hint">この週に日付のある予定はありません。</p>'}`;
+}
+
+function openRoutineEdit(id) {
+  const r = db.routines.find(x => x.id === id), dlg = $('#edit-dialog');
+  if (!r) return;
+  dlg.innerHTML = `<form data-form="editroutine:${r.id}" class="sync-form">
+    <h2>ルーティンを編集</h2>
+    <label class="field"><span class="lbl">内容</span><input name="t" value="${esc(r.name)}" required></label>
+    <label class="field"><span class="lbl">週に何回</span><select name="target">${[1, 2, 3, 4, 5, 6, 7].map(n => `<option value="${n}"${n === r.target ? ' selected' : ''}>週${n}回</option>`).join('')}</select></label>
+    <label class="field"><span class="lbl">ジャンル</span>${genreSelect('g', r.g || '')}</label>
+    <div class="btn-row"><button class="btn primary">保存</button><button type="button" class="btn" data-act="edit-close">キャンセル</button><button type="button" class="btn" data-act="rdel" data-id="${r.id}">削除</button></div>
+  </form>`;
+  if (!dlg.open) dlg.showModal();
 }
 
 // ---- マンスリー ----
@@ -336,15 +403,15 @@ function saveEdit(f, id) {
   if (!text) return;
   if (end && !d) { toast('終了日を入れるときは、開始日も入れてください'); return; }
   if (end && end < d) { toast('終了日は開始日より後にしてください'); return; }
-  if (!d && !month) { toast('開始日か月のどちらかを入れてください'); return; }
+  if (!d && !month && !e.week) { toast('開始日か月のどちらかを入れてください'); return; }
   e.text = text; e.type = f.type.value; e.g = f.g.value; e.priority = f.pri.checked;
   if (e.type !== 'task' && e.status === 'done') e.status = 'open';
   if (d) {
     const wasPlain = e.date && !e.month && !e.planned;       // デイリーで入れた予定は、そのまま
     e.date = d; e.endDate = end > d ? end : null;
-    if (!wasPlain) { e.planned = true; e.month = d.slice(0, 7); }
+    if (!wasPlain && !e.week) { e.planned = true; e.month = d.slice(0, 7); }
   } else {
-    e.month = month; e.date = null; e.endDate = null; e.planned = false;
+    e.month = month || (e.week ? null : e.month); e.date = null; e.endDate = null; e.planned = false;
   }
   $('#edit-dialog').close();
   save(); render();
@@ -362,7 +429,7 @@ function futureMonth(e) {
 // ---- 描画 ----
 function render() {
   document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === state.tab));
-  const v = { daily: viewDaily, monthly: viewMonthly, future: viewFuture, wishes: viewWishes, shop: viewShop, places: viewPlaces, trades: viewTrades, guide: viewGuide }[state.tab];
+  const v = { daily: viewDaily, weekly: viewWeekly, monthly: viewMonthly, future: viewFuture, wishes: viewWishes, shop: viewShop, places: viewPlaces, trades: viewTrades, guide: viewGuide }[state.tab];
   $('#view').innerHTML = v();
 }
 
@@ -379,12 +446,19 @@ document.addEventListener('click', ev => {
     case 'mon': state.month = addMonths(state.month, +b.dataset.n); break;
     case 'opendate': state.date = b.dataset.date; state.tab = 'daily'; break;
     case 'toggle':
+      if (e && e.ref && refSource(e)) { toggleRef(e); break; }
       if (!e || e.type !== 'task') return;
       e.status = e.status === 'done' ? 'open' : e.status === 'open' ? 'done' : e.status; break;
     case 'tomorrow': if (e) migrateTo(e, { date: addDays(e.date, 1) }, 'migrated'); break;
     case 'future': if (e) migrateTo(e, { month: futureMonth(e) }, 'scheduled'); break;
     case 'cancel': if (e) e.status = 'cancelled'; break;
     case 'del': db.entries = db.entries.filter(x => x.id !== b.dataset.id); break;
+    case 'wk': state.week = addDays(state.week, +b.dataset.n); break;
+    case 'wkcur': state.week = weekStartOf(today()); break;
+    case 'nextweek': if (e) migrateTo(e, { week: addDays(e.week || weekStartOf(e.date || today()), 7), date: null, ref: e.ref || null }, 'migrated'); break;
+    case 'rcheck': { const r = db.routines.find(x => x.id === b.dataset.id); if (r) { const d = b.dataset.date, i = r.days.indexOf(d); if (i >= 0) r.days.splice(i, 1); else r.days.push(d); } break; }
+    case 'redit': openRoutineEdit(b.dataset.id); return;
+    case 'rdel': if (!confirm('このルーティンを削除しますか?(チェックの記録も消えます)')) return; db.routines = db.routines.filter(x => x.id !== b.dataset.id); $('#edit-dialog').close(); break;
     case 'edit': openEdit(b.dataset.id); return;
     case 'edittrade': openTradeEdit(b.dataset.id); return;
     case 'edit-close': $('#edit-dialog').close(); return;
@@ -419,6 +493,11 @@ document.addEventListener('submit', ev => {
   if (!raw.trim()) return;
   const [kind, arg] = f.dataset.form.split(':');
   if (kind === 'edit') { saveEdit(f, arg); return; }
+  if (kind === 'editroutine') {
+    const r = db.routines.find(x => x.id === arg);
+    if (r) { r.name = raw.trim(); r.target = +f.target.value; r.g = f.g.value; $('#edit-dialog').close(); save(); render(); }
+    return;
+  }
   if (kind === 'edittrade') { saveTradeEdit(f, arg); return; }
   const g = f.elements.g ? f.elements.g.value : '';
   if (kind === 'daily') {
@@ -439,6 +518,14 @@ document.addEventListener('submit', ev => {
     db.shop.push({ id: uid(), name: raw.trim(), price: Number(f.p.value) || 0, pri: f.r.value, bought: false });
   } else if (kind === 'place') {
     db.places.push({ id: uid(), name: raw.trim(), pref: f.pref.value, memo: f.m.value.trim(), plan: f.plan.value, done: false, doneMonth: '' });
+  } else if (kind === 'newroutine') {
+    db.routines.push({ id: uid(), name: raw.trim(), target: +f.target.value, g, days: [] });
+  } else if (kind === 'weekly') {
+    const p = parseRapid(raw, 'task');
+    if (p.text) addEntry({ ...p, g, week: state.week, date: f.elements.day.value || null });
+  } else if (kind === 'reflect') {
+    const [list, rid] = raw.split(':'), src = db[list] && db[list].find(x => x.id === rid);
+    if (src && REF_LABEL[list]) addEntry({ type: 'task', text: src.text || src.name, g: '', week: state.week, date: f.elements.day2.value || null, ref: { list, id: rid } });
   } else if (kind === 'newgenre') {
     const n = db.genres.length;
     db.genres.push({ id: uid(), name: raw.trim(), color: GENRE_COLORS[n % GENRE_COLORS.length], symbol: GENRE_SYMBOLS[n % GENRE_SYMBOLS.length] });
