@@ -22,7 +22,7 @@ service cloud.firestore {
     match /users/{uid}/{col}/{docId} {
       allow read, write: if signedIn()
         && request.auth.uid == uid
-        && col in ['entries', 'wishes', 'shop', 'places', 'trades', 'genres', 'config'];
+        && col in ['entries', 'wishes', 'shop', 'places', 'trades', 'routines', 'genres', 'config'];
     }
 
     match /families/{fid} {
