@@ -111,13 +111,14 @@ def main():
         names = [vid[s['material_id']]['material_name'] for s in vsegs]
         starts = [s['target_timerange']['start'] for s in vsegs]
 
-        # the first label must wait until the title (a text starting in the first second) is gone
+        # the first label must wait until the title (first text track, first segment; it may start
+        # after an intro jingle, not necessarily at 0) is gone
         title_end = 0
         for t in d['tracks']:
-            if t['type'] == 'text':
-                for s in t['segments']:
-                    if s['target_timerange']['start'] < 1000000:
-                        title_end = max(title_end, s['target_timerange']['start'] + s['target_timerange']['duration'])
+            if t['type'] == 'text' and t['segments']:
+                first = min(t['segments'], key=lambda s: s['target_timerange']['start'])
+                title_end = first['target_timerange']['start'] + first['target_timerange']['duration']
+                break
 
         idx = [0]
         for i in range(1, len(vsegs)):
