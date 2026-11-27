@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Split a CapCut project's single video track into several NEW projects and decorate each one
+"""Split a CapCut project's single video track into one or more NEW projects and decorate each one
 with a typewriter title, a typing sound effect and BGM (one song per scene, looped if the scene is
 longer than the song), copying the look from a template project that already uses them.
+With a single half covering the whole timeline this just decorates one project (original untouched).
 
 Usage:
     python3 split_decorate.py --config split.json [--root <draft root>]
@@ -10,25 +11,28 @@ split.json:
 {
   "source":   "旅行_全クリップ",          // project holding the cut timeline (not modified)
   "template": "0721-コピー",              // project whose title/typing animation/BGM we copy
-  "songs":    ["fresh start", "3：30PM", "Honey Tea", "coffee time"],   // names as in the template
+  "songs":    ["fresh start", "3：30PM",  // one entry per scene. A string = a song of the template.
+               {"name": "VLOG いつもの生活と優しい歌♪", "from": "source"},   // = a song already in the source project
+               "coffee time"],
   "halves": [
     {"name": "旅行_前半", "from": 0,  "to": 66,   "scene_starts": [9, 34, 50],
      "title": "2026年8月23日〜24日\\n福井旅行 前編"},
-    {"name": "旅行_後半", "from": 66, "to": null, "scene_starts": [83, 88, 95],
-     "title": "..."}
+    {"name": "1127_仕上げ", "from": 0, "to": null, "scene_starts": [6, 13, 26],
+     "title": "...",
+     "keep_source_audio": true,                      // keep what is already on the source's audio tracks (e.g. an intro jingle)
+     "drop_audio_names": ["VLOG いつもの生活と優しい歌♪"],   // ...except these (they are re-placed as scene BGM)
+     "after_intro": true}                            // title, typing sound and scene-1 BGM start when the kept intro ends
   ]
 }
 "from"/"to" are indexes into the video track's segments (to is exclusive, null = to the end).
 "scene_starts" are the 3 segment indexes (absolute, same numbering as from/to) where scenes 2..4 begin;
-use suggest_scenes.py to propose them. Quit CapCut before running.
+use suggest_scenes.py to propose them. keep_source_audio needs "from": 0. Quit CapCut before running.
 """
 import argparse, json, os, shutil, uuid, time, copy, glob
 
 DEFAULT_ROOT = '~/Movies/CapCut/User Data/Projects/com.lveditor.draft'
-FPS_US = 1e6
 FADE_EDGE = 1500000   # fade-out at the end of a scene (us)
 FADE_JOIN = 500000    # fade at loop joins inside a scene (us)
-TITLE_START = 0
 
 
 def nid():
@@ -45,6 +49,16 @@ def tl_file(base):
     return fs[0]
 
 
+def index_materials(d):
+    out = {}
+    for k, v in d['materials'].items():
+        if isinstance(v, list):
+            for e in v:
+                if isinstance(e, dict) and 'id' in e:
+                    out[e['id']] = (k, e)
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--root', default=DEFAULT_ROOT)
@@ -52,17 +66,26 @@ def main():
     args = ap.parse_args()
     ROOT = os.path.expanduser(args.root)
     cfg = json.load(open(args.config))
-    SRC_NAME, TPL_NAME, SONGS = cfg['source'], cfg['template'], cfg['songs']
+    SRC_NAME, TPL_NAME = cfg['source'], cfg['template']
     SRC, TPL = ROOT + '/' + SRC_NAME, ROOT + '/' + TPL_NAME
+    song_specs = [(s, 'tpl') if isinstance(s, str) else (s['name'], s.get('from', 'tpl')) for s in cfg['songs']]
+
+    # ---- source (read-only) ----
+    src_meta = json.load(open(SRC + '/draft_meta_info.json'))
+    src_proj = json.load(open(SRC + '/Timelines/project.json'))
+    OLD_TL, OLD_PROJ, OLD_DRAFT = src_proj['main_timeline_id'], src_proj['id'], src_meta['draft_id']
+    src_d = json.load(open(tl_file(SRC)))
+    src_all = index_materials(src_d)
+    all_segs = src_d['tracks'][0]['segments']
+    assert src_d['tracks'][0]['type'] == 'video', 'first source track must be the video track'
+    src_audio_tracks = [t for t in src_d['tracks'][1:] if t['type'] == 'audio' and t['segments']]
+    assert all(t['type'] in ('audio',) or not t['segments'] for t in src_d['tracks'][1:]), \
+        'source has text/other tracks; only a video track (+ audio with keep_source_audio) is supported: %s' % \
+        [t['type'] for t in src_d['tracks']]
 
     # ---- template (read-only) ----
     tpl = json.load(open(tl_file(TPL)))
-    tpl_all = {}
-    for k, v in tpl['materials'].items():
-        if isinstance(v, list):
-            for e in v:
-                if isinstance(e, dict) and 'id' in e:
-                    tpl_all[e['id']] = (k, e)
+    tpl_all = index_materials(tpl)
     tpl_audio_tracks = [t for t in tpl['tracks'] if t['type'] == 'audio']
     tpl_text_tracks = [t for t in tpl['tracks'] if t['type'] == 'text']
     tpl_title_seg = tpl_text_tracks[0]['segments'][0]
@@ -74,21 +97,32 @@ def main():
     for t in tpl_audio_tracks:
         for s in t['segments']:
             a = tpl_all[s['material_id']][1]
-            if a['name'] in SONGS and a['name'] not in tpl_song_seg:
+            if a['name'] not in tpl_song_seg:
                 tpl_song_seg[a['name']] = s
             if a['type'] == 'sound' and 'タイピング' in a['name'] and tpl_sfx_seg is None:
                 tpl_sfx_seg = s
-    assert set(tpl_song_seg) == set(SONGS), 'songs not found in template: %s' % (set(SONGS) - set(tpl_song_seg))
     assert tpl_sfx_seg is not None, 'no typing sound effect in template'
-    for n in SONGS:      # only songs CapCut has cached on this Mac can be reused
-        p = tpl_all[tpl_song_seg[n]['material_id']][1]['path']
-        assert os.path.exists(p), 'missing song file ' + p
     assert os.path.exists(tpl_all[tpl_sfx_seg['material_id']][1]['path'])
-    song_vol = {n: tpl_song_seg[n]['volume'] for n in SONGS}      # keep the template's mix
 
-    def add_audio_segment(d, track, tseg, start, src_start, dur, volume, fade_in, fade_out):
+    # song name -> (segment to copy from, material map that segment's ids live in)
+    song_src = {}
+    for name, origin in song_specs:
+        if origin == 'source':
+            seg = next((s for t in src_audio_tracks for s in t['segments']
+                        if src_all[s['material_id']][1]['name'] == name), None)
+            assert seg is not None, 'song %r not found in source project audio' % name
+            song_src[name] = (seg, src_all)
+        else:
+            assert name in tpl_song_seg, 'song %r not found in template' % name
+            song_src[name] = (tpl_song_seg[name], tpl_all)
+        p = song_src[name][1][song_src[name][0]['material_id']][1]['path']
+        assert os.path.exists(p), 'missing song file ' + p      # only songs cached on this Mac can be reused
+    SONGS = [n for n, _ in song_specs]
+    song_vol = {n: song_src[n][0]['volume'] for n in SONGS}      # keep the original mix
+
+    def add_audio_segment(d, track, amap, tseg, start, src_start, dur, volume, fade_in, fade_out):
         m = d['materials']
-        a = copy.deepcopy(tpl_all[tseg['material_id']][1])
+        a = copy.deepcopy(amap[tseg['material_id']][1])
         a['id'] = nid()
         m.setdefault('audios', []).append(a)
         s = copy.deepcopy(tseg)
@@ -100,7 +134,7 @@ def main():
         s['last_nonzero_volume'] = volume
         refs = []
         for r in tseg['extra_material_refs']:
-            k, e = tpl_all[r]
+            k, e = amap[r]
             h = copy.deepcopy(e)
             h['id'] = nid()
             if k == 'audio_fades':
@@ -111,19 +145,16 @@ def main():
         s['extra_material_refs'] = refs
         track['segments'].append(s)
 
-    src_meta = json.load(open(SRC + '/draft_meta_info.json'))
-    src_proj = json.load(open(SRC + '/Timelines/project.json'))
-    OLD_TL, OLD_PROJ, OLD_DRAFT = src_proj['main_timeline_id'], src_proj['id'], src_meta['draft_id']
-    src_d = json.load(open(tl_file(SRC)))
-    all_segs = src_d['tracks'][0]['segments']
-    assert src_d['tracks'][0]['type'] == 'video' and len(src_d['tracks']) == 1, \
-        'source must contain only one video track (found %s)' % [t['type'] for t in src_d['tracks']]
-
     summary = []
     for h in cfg['halves']:
         name, lo, hi = h['name'], h['from'], h['to']
         scene_idx, title = h['scene_starts'], h['title']
+        keep_audio = h.get('keep_source_audio', False)
+        drop_names = set(h.get('drop_audio_names', []))
         hi = len(all_segs) if hi is None else hi
+        if src_audio_tracks and not keep_audio:
+            raise SystemExit('source has audio tracks: set "keep_source_audio": true (and list "drop_audio_names") for %s' % name)
+        assert not keep_audio or lo == 0, 'keep_source_audio needs "from": 0'
         DST = ROOT + '/' + name
         assert not os.path.exists(DST), 'already exists: ' + DST
         shutil.copytree(SRC, DST)
@@ -155,9 +186,26 @@ def main():
         vtrack['segments'] = keep
         total = keep[-1]['target_timerange']['start'] + keep[-1]['target_timerange']['duration']
 
+        # source audio that stays (e.g. an intro jingle)
+        d_all = index_materials(d)
+        kept_audio_tracks = []
+        intro_end = 0
+        if keep_audio:
+            for t in d['tracks'][1:]:
+                if t['type'] != 'audio':
+                    continue
+                segs_ = [s for s in t['segments'] if d_all[s['material_id']][1]['name'] not in drop_names]
+                if segs_:
+                    t['segments'] = segs_
+                    kept_audio_tracks.append(t)
+                    for s in segs_:
+                        if s['target_timerange']['start'] == 0:
+                            intro_end = max(intro_end, s['target_timerange']['duration'])
+        t_start = intro_end if h.get('after_intro') else 0
+
         # prune materials to what the kept segments reference
         refset = set()
-        for s in keep:
+        for s in keep + [s for t in kept_audio_tracks for s in t['segments']]:
             refset.add(s['material_id'])
             refset.update(s['extra_material_refs'])
         m = d['materials']
@@ -167,7 +215,7 @@ def main():
         kept_videos = m['videos']
 
         starts = [keep[i - lo]['target_timerange']['start'] for i in scene_idx]
-        bounds = [0] + starts + [total]
+        bounds = [t_start] + starts + [total]
 
         # title (typewriter)
         txt = copy.deepcopy(tpl_title_text)
@@ -185,7 +233,7 @@ def main():
         ts['id'] = nid()
         ts['material_id'] = txt['id']
         ts['extra_material_refs'] = [anim['id']]
-        ts['target_timerange'] = {'start': TITLE_START, 'duration': title_dur}
+        ts['target_timerange'] = {'start': t_start, 'duration': title_dur}
         ttrack = copy.deepcopy(tpl_text_tracks[0])
         ttrack['id'] = nid()
         ttrack['segments'] = [ts]
@@ -195,13 +243,14 @@ def main():
         songtrack['id'] = nid()
         songtrack['segments'] = []
         for i, song in enumerate(SONGS):
-            a_dur = tpl_all[tpl_song_seg[song]['material_id']][1]['duration']
+            tseg, amap = song_src[song]
+            a_dur = amap[tseg['material_id']][1]['duration']
             pos, end = bounds[i], bounds[i + 1]
             first = True
             while pos < end:
                 dur = min(a_dur, end - pos)
                 last = (pos + dur >= end)
-                add_audio_segment(d, songtrack, tpl_song_seg[song], pos, 0, dur, song_vol[song],
+                add_audio_segment(d, songtrack, amap, tseg, pos, 0, dur, song_vol[song],
                                   FADE_EDGE if first and i > 0 else (FADE_JOIN if not first else 0),
                                   FADE_EDGE if last else FADE_JOIN)
                 pos += dur
@@ -210,10 +259,10 @@ def main():
         sfxtrack = copy.deepcopy(tpl_audio_tracks[-1])
         sfxtrack['id'] = nid()
         sfxtrack['segments'] = []
-        add_audio_segment(d, sfxtrack, tpl_sfx_seg, TITLE_START, 0,
+        add_audio_segment(d, sfxtrack, tpl_all, tpl_sfx_seg, t_start, 0,
                           tpl_sfx_seg['target_timerange']['duration'], 1.0, 0, 0)
 
-        d['tracks'] = [vtrack, ttrack, songtrack, sfxtrack]
+        d['tracks'] = [vtrack, ttrack] + kept_audio_tracks + [songtrack, sfxtrack]
         d['id'] = NEW_TL
         d['duration'] = total
         blob = dump(d)
