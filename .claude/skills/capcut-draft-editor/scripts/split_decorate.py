@@ -21,9 +21,17 @@ split.json:
      "title": "...",
      "keep_source_audio": true,                      // keep what is already on the source's audio tracks (e.g. an intro jingle)
      "drop_audio_names": ["VLOG いつもの生活と優しい歌♪"],   // ...except these (they are re-placed as scene BGM)
-     "after_intro": true}                            // title, typing sound and scene-1 BGM start when the kept intro ends
+     "after_intro": true}                            // scene-1 BGM starts when the kept intro ends; the title is placed per "title_mode"
   ]
 }
+Opening / title placement ("title_mode", per half):
+  "start"               title + typing sound at 0:00 (default when there is no intro).
+  "after_intro"         title starts when the kept intro ends (the first design).
+  "end_at_first_clip"   (default when "after_intro" is true) the title ends exactly where the first clip ends and
+                        lasts "title_dur_s" (default 5.767 s), so it overlays the last seconds of clip 1 and the
+                        intro jingle; the typing sound starts with it, louder ("title_sfx_volume", default 1.477).
+                        add_labels.py then starts the first label right when the title ends. This is the user's
+                        own hand-tuned opening of the 1127 project.
 "from"/"to" are indexes into the video track's segments (to is exclusive, null = to the end).
 "scene_starts" are the 3 segment indexes (absolute, same numbering as from/to) where scenes 2..4 begin;
 use suggest_scenes.py to propose them. keep_source_audio needs "from": 0. Quit CapCut before running.
@@ -201,7 +209,18 @@ def main():
                     for s in segs_:
                         if s['target_timerange']['start'] == 0:
                             intro_end = max(intro_end, s['target_timerange']['duration'])
-        t_start = intro_end if h.get('after_intro') else 0
+        bgm_start = intro_end if h.get('after_intro') else 0
+        title_mode = h.get('title_mode', 'end_at_first_clip' if h.get('after_intro') else 'start')
+        t_dur, sfx_vol = title_dur, 1.0
+        if title_mode == 'end_at_first_clip':
+            t_dur = int(round(h.get('title_dur_s', 5.766667) * 1e6))
+            t_end = max(keep[0]['target_timerange']['duration'], t_dur)
+            t_start = t_end - t_dur
+            sfx_vol = h.get('title_sfx_volume', 1.477370023727417)
+        elif title_mode == 'after_intro':
+            t_start = intro_end
+        else:
+            t_start = 0
 
         # prune materials to what the kept segments reference
         refset = set()
@@ -215,7 +234,7 @@ def main():
         kept_videos = m['videos']
 
         starts = [keep[i - lo]['target_timerange']['start'] for i in scene_idx]
-        bounds = [t_start] + starts + [total]
+        bounds = [bgm_start] + starts + [total]
 
         # title (typewriter)
         txt = copy.deepcopy(tpl_title_text)
@@ -233,7 +252,7 @@ def main():
         ts['id'] = nid()
         ts['material_id'] = txt['id']
         ts['extra_material_refs'] = [anim['id']]
-        ts['target_timerange'] = {'start': t_start, 'duration': title_dur}
+        ts['target_timerange'] = {'start': t_start, 'duration': t_dur}
         ttrack = copy.deepcopy(tpl_text_tracks[0])
         ttrack['id'] = nid()
         ttrack['segments'] = [ts]
@@ -260,7 +279,7 @@ def main():
         sfxtrack['id'] = nid()
         sfxtrack['segments'] = []
         add_audio_segment(d, sfxtrack, tpl_all, tpl_sfx_seg, t_start, 0,
-                          tpl_sfx_seg['target_timerange']['duration'], 1.0, 0, 0)
+                          tpl_sfx_seg['target_timerange']['duration'], sfx_vol, 0, 0)
 
         d['tracks'] = [vtrack, ttrack] + kept_audio_tracks + [songtrack, sfxtrack]
         d['id'] = NEW_TL
