@@ -12,14 +12,15 @@ split.json:
   "source":   "旅行_全クリップ",          // project holding the cut timeline (not modified)
   "template": "0721-コピー",              // project whose title/typing animation/BGM we copy
   "songs":    ["fresh start", "3：30PM",  // one entry per scene. A string = a song of the template.
-               {"name": "VLOG いつもの生活と優しい歌♪", "from": "source"},   // = a song already in the source project
+               {"name": "VLOG いつもの生活と優しい歌♪", "from": "1127"},   // = a song of another project ("source" = the source project itself)
                "coffee time"],
   "halves": [
     {"name": "旅行_前半", "from": 0,  "to": 66,   "scene_starts": [9, 34, 50],
      "title": "2026年8月23日〜24日\\n福井旅行 前編"},
     {"name": "1127_仕上げ", "from": 0, "to": null, "scene_starts": [6, 13, 26],
      "title": "...",
-     "keep_source_audio": true,                      // keep what is already on the source's audio tracks (e.g. an intro jingle)
+     "intro": {"from": "1127", "name": "10秒　軽やかで可愛いフルートのジングル"},   // put this jingle of another project at 0:00 (implies after_intro)
+     "keep_source_audio": true,                      // OR keep what is already on the source's audio tracks (e.g. an intro jingle)
      "drop_audio_names": ["VLOG いつもの生活と優しい歌♪"],   // ...except these (they are re-placed as scene BGM)
      "after_intro": true}                            // scene-1 BGM starts when the kept intro ends; the title is placed per "title_mode"
   ]
@@ -112,14 +113,23 @@ def main():
     assert tpl_sfx_seg is not None, 'no typing sound effect in template'
     assert os.path.exists(tpl_all[tpl_sfx_seg['material_id']][1]['path'])
 
+    proj_cache = {}
+
+    def find_audio(pname, name):
+        """first audio segment called `name` in project `pname` -> (segment, material map of that project)"""
+        if pname not in proj_cache:
+            dd = json.load(open(tl_file(ROOT + '/' + pname)))
+            proj_cache[pname] = (index_materials(dd), [s for t in dd['tracks'] if t['type'] == 'audio' for s in t['segments']])
+        am, segs_ = proj_cache[pname]
+        seg = next((x for x in segs_ if am[x['material_id']][1]['name'] == name), None)
+        assert seg is not None, 'audio %r not found in project %r' % (name, pname)
+        return seg, am
+
     # song name -> (segment to copy from, material map that segment's ids live in)
     song_src = {}
     for name, origin in song_specs:
-        if origin == 'source':
-            seg = next((s for t in src_audio_tracks for s in t['segments']
-                        if src_all[s['material_id']][1]['name'] == name), None)
-            assert seg is not None, 'song %r not found in source project audio' % name
-            song_src[name] = (seg, src_all)
+        if origin != 'tpl':
+            song_src[name] = find_audio(SRC_NAME if origin == 'source' else origin, name)
         else:
             assert name in tpl_song_seg, 'song %r not found in template' % name
             song_src[name] = (tpl_song_seg[name], tpl_all)
@@ -209,8 +219,20 @@ def main():
                     for s in segs_:
                         if s['target_timerange']['start'] == 0:
                             intro_end = max(intro_end, s['target_timerange']['duration'])
-        bgm_start = intro_end if h.get('after_intro') else 0
-        title_mode = h.get('title_mode', 'end_at_first_clip' if h.get('after_intro') else 'start')
+        intro_cfg = h.get('intro')
+        if intro_cfg:                      # a jingle taken from another project, placed at 0:00
+            tseg, amap = find_audio(SRC_NAME if intro_cfg['from'] == 'source' else intro_cfg['from'], intro_cfg['name'])
+            assert os.path.exists(amap[tseg['material_id']][1]['path']), 'missing intro file'
+            introtrack = copy.deepcopy(tpl_audio_tracks[0])
+            introtrack['id'] = nid()
+            introtrack['segments'] = []
+            idur = tseg['target_timerange']['duration']
+            add_audio_segment(d, introtrack, amap, tseg, 0, tseg['source_timerange']['start'], idur, tseg['volume'], 0, 0)
+            kept_audio_tracks.append(introtrack)
+            intro_end = max(intro_end, idur)
+        after_intro = h.get('after_intro') or bool(intro_cfg)
+        bgm_start = intro_end if after_intro else 0
+        title_mode = h.get('title_mode', 'end_at_first_clip' if after_intro else 'start')
         t_dur, sfx_vol = title_dur, 1.0
         if title_mode == 'end_at_first_clip':
             t_dur = int(round(h.get('title_dur_s', 5.766667) * 1e6))
